@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## Controle seus pedidos e acelere suas vendas 
 ## Projeto semestral das disciplinas ECM252 e ECM516 do IMT
 
@@ -24,3 +25,12 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+=======
+Controle seus pedidos e acelere suas vendas
+
+Alunos: Guilherme de Santana Pinto  RA: 23.00758-3, Maria Luiza Bogossian Remaili  RA: 23.01409-0, Rafaella Bataglia Dallovo  RA: 23.00977-2, Sarah Mascarese de Souza  RA: 23.00635-8
+
+O projeto é uma solução de interface inteligente baseada na metodologia Kanban, com o objetivo de gerenciar operações de e-commerce e logística que precisam de uma visão de cada etapa do pedido.
+
+
+>>>>>>> 9ddc121c8c5123a7b7c2ba16f763fc96aea392fd
