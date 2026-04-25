@@ -53,10 +53,37 @@ const App = () => {
     { titulo: 'Pedido Entregue', cor: '#7ED957' },
   ];
 
-  return (
+  const [pedido, setpedido] = useState([]);
+
+  const handleCriarPedido = async () => {
+    const novoPedido = {
+        titulo: "Novo Pedido de Teste",
+        descricao: "Criado pelo botão do React",
+        responsavel: "Rafaella" // O campo que adicionamos no MySQL!
+    };
+
+    try {
+        const response = await fetch('http://localhost:3000/tarefas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(novoPedido)
+        });
+
+        if (response.ok) {
+            alert("Pedido criado no banco!");
+            // Aqui você chamaria um GET para atualizar a tela
+        }
+    } catch (error) {
+        console.error("Erro ao conectar:", error);
+    }
+ }
+
+ return (
     <div style={containerStyle}>
       {/* Botão Superior */}
-      <button style={botãoCriarPedido}>
+      <button style={botãoCriarPedido} 
+      //torna o botão funcional
+      onClick={handleCriarPedido} >
         <span style={{ color: 'darkblue', fontSize: '20px', marginRight: '8px' }}>+</span>
         Criar Pedido
       </button>
@@ -73,6 +100,7 @@ const App = () => {
       </div>
     </div>
   );
+
 };
 
 export default App;
