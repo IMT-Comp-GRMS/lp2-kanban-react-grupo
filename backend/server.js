@@ -37,7 +37,7 @@ app.get('/tarefas', async (req, res) => {
     }
 })
 
-app.post('/tarefas', async (req, res) {
+app.post('/tarefas', async (req, res) => {
     try{
         const {titulo, descricao } = req.body
         const sql = 
