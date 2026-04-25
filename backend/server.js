@@ -11,7 +11,7 @@ let conexao
 async function conectar(){
     conexao = await mysql.createConnection({
         host: process.env.HOST,
-        user: process.env.USERNAME,
+        user: process.env.USERBD,
         password: process.env.PASSWORD,
         database: process.env.DATABASE
     })

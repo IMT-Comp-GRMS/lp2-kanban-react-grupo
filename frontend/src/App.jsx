@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const App = () => {
-
-  // container padrão
+  // 1. Estilos
   const containerStyle = {
     backgroundColor: '#F3F4F7',
     padding: '20px',
@@ -10,7 +9,6 @@ const App = () => {
     minHeight: '100vh'
   };
 
-  //botão criar pedido
   const botãoCriarPedido = {
     display: 'flex',
     alignItems: 'center',
@@ -44,7 +42,36 @@ const App = () => {
     fontWeight: '500'
   };
 
-  // Dados das colunas para facilitar a renderização
+  const modalOverlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  };
+
+  const modalContentStyle = {
+    backgroundColor: 'white',
+    padding: '30px',
+    borderRadius: '12px',
+    width: '350px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px'
+  };
+
+  const inputStyle = {
+    padding: '10px',
+    borderRadius: '6px',
+    border: '1px solid #ccc'
+  };
+
+  // 2. Dados e Estados
   const colunas = [
     { titulo: 'Pedidos', cor: '#63E6BE' },
     { titulo: 'Pagamento Confirmado', cor: '#FFD43B' },
@@ -53,13 +80,20 @@ const App = () => {
     { titulo: 'Pedido Entregue', cor: '#7ED957' },
   ];
 
-  const [pedido, setpedido] = useState([]);
 
+
+  const [pedidos, setPedidos] = useState([]);
+  const [titulo, setTitulo] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [responsavel, setResponsavel] = useState('');
+  const [mostrarModal, setMostrarModal] = useState(false); // Para abrir/fechar a janelinha
+
+  // 3. Função do Botão
   const handleCriarPedido = async () => {
     const novoPedido = {
-        titulo: "Novo Pedido de Teste",
-        descricao: "Criado pelo botão do React",
-        responsavel: "Rafaella" // O campo que adicionamos no MySQL!
+        titulo: titulo,         // Usa o que foi digitado
+        descricao: descricao,   // Usa o que foi digitado
+        responsavel: responsavel // Usa o que foi digitado
     };
 
     try {
@@ -70,25 +104,54 @@ const App = () => {
         });
 
         if (response.ok) {
-            alert("Pedido criado no banco!");
-            // Aqui você chamaria um GET para atualizar a tela
+          alert("Pedido salvo com sucesso!");
+            setMostrarModal(false); // Fecha o modal
+            setTitulo(''); setDescricao(''); setResponsavel(''); // Limpa os campos
+            // Chamar a função de carregar dados aqui (o item 2 que você mencionou)
         }
     } catch (error) {
         console.error("Erro ao conectar:", error);
+        alert("Não foi possível conectar ao servidor. O Backend está rodando?");
     }
- }
+  };
 
- return (
+ 
+  // 4. Renderização
+  return (
     <div style={containerStyle}>
-      {/* Botão Superior */}
-      <button style={botãoCriarPedido} 
-      //torna o botão funcional
-      onClick={handleCriarPedido} >
+      {mostrarModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3>Novo Pedido</h3>
+            <input 
+              placeholder="Título do Pedido" 
+              value={titulo} 
+              onChange={(e) => setTitulo(e.target.value)} 
+              style={inputStyle}
+            />
+            <textarea 
+              placeholder="Descrição" 
+              value={descricao} 
+              onChange={(e) => setDescricao(e.target.value)} 
+              style={inputStyle}
+            />
+            <input 
+              placeholder="Responsável" 
+              value={responsavel} 
+              onChange={(e) => setResponsavel(e.target.value)} 
+              style={inputStyle}
+            />
+            <button onClick={handleCriarPedido}>Salvar Pedido</button>
+            <button onClick={() => setMostrarModal(false)}>Cancelar</button>
+          </div>
+        </div>
+        )}
+
+      <button style={botãoCriarPedido} onClick={() => setMostrarModal(true)}>
         <span style={{ color: 'darkblue', fontSize: '20px', marginRight: '8px' }}>+</span>
         Criar Pedido
       </button>
 
-      {/* Container das Colunas */}
       <div style={kanbanContainerStyle}>
         {colunas.map((col, index) => (
           <div key={index} style={colunaStyle}>
@@ -100,7 +163,6 @@ const App = () => {
       </div>
     </div>
   );
-
 };
 
 export default App;
