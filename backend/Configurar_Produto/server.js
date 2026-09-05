@@ -1,4 +1,4 @@
-require('dotenv').config();  
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
@@ -14,7 +14,9 @@ let conexao;
  * ============================================================================
  * CONEXÃO COM O BANCO DE DADOS
  * ============================================================================
- * Estabelece a conexão com o MySQL usando as credenciais do arquivo .env.
+ * Estabelece a conexão com o MySQL usando as credenciais do arquivo .env
+ * (localmente) ou das variáveis de ambiente injetadas pelo Kubernetes
+ * via ConfigMap/Secret (em produção/cluster).
  */
 async function conectar() {
     try {
@@ -66,7 +68,8 @@ app.post('/produtos', async (req, res) => {
 
     const produtoCriado = { id: resultado.insertId, nome, preco };
 
-    await axios.post('http://localhost:10000/eventos', {
+    //nome do Service do barramento no Kubernetes, em vez de localhost
+    await axios.post('http://barramento-service:10000/eventos', {
       tipo: 'ProdutoCriado',
       dados: produtoCriado
     }).catch(err => console.log('Barramento fora do ar:', err.message));
@@ -82,5 +85,5 @@ app.post('/produtos', async (req, res) => {
    3. INICIALIZAÇÃO DO SERVIDOR
    ========================================================================== */
 app.listen(3001, () => {
-    console.log('Classificação. Porta 3001')
+    console.log('Configurar_Produto. Porta 3001')
 })
