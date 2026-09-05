@@ -21,7 +21,8 @@ async function conectar() {
             host: process.env.HOST,
             user: process.env.USERBD,
             password: process.env.PASSWORD,
-            database: process.env.DATABASE
+            database: process.env.DATABASE,
+            charset: 'utf8mb4'
         });
         console.log('✅ Conectado ao BD_Historico com sucesso!');
     } catch (erro) {
