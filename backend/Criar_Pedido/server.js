@@ -26,7 +26,9 @@ let conexao;
  * ============================================================================
  * CONEXÃO COM O BANCO DE DADOS
  * ============================================================================
- * Estabelece a conexão com o MySQL usando as credenciais do arquivo .env.
+ * Estabelece a conexão com o MySQL usando as credenciais do arquivo .env
+ * (localmente) ou das variáveis de ambiente injetadas pelo Kubernetes
+ * via ConfigMap/Secret (em produção/cluster).
  */
 async function conectar() {
     try {
@@ -134,7 +136,7 @@ app.post('/tarefas', async (req, res) => {
         }
 
         // 3. Publica o evento no barramento para o dashboard
-        await axios.post('http://localhost:10000/eventos', {
+        await axios.post('http://barramento-service:10000/eventos', {
             tipo: 'PedidoCriado',
             dados: {
                 id: novoPedidoId,
@@ -175,7 +177,7 @@ app.put('/tarefas/:id', async (req, res) => {
         }
 
         // Publica o evento no barramento para registrar no histórico e atualizar o dashboard
-        await axios.post('http://localhost:10000/eventos', {
+        await axios.post('http://barramento-service:10000/eventos', {
             tipo: 'PedidoMovido',
             dados: {
                 pedido_id: idDoPedido,
@@ -210,7 +212,7 @@ app.delete('/tarefas/:id', async (req, res) => {
             return res.status(404).json({ erro: 'Pedido não encontrado para exclusão.' });
         }
 
-        await axios.post('http://localhost:10000/eventos', {
+        await axios.post('http://barramento-service:10000/eventos', {
             tipo: 'PedidoDeletado',
             dados: { pedido_id: idDoPedido }
         }).catch(err => console.log('Barramento fora do ar:', err.message));
@@ -239,7 +241,7 @@ app.post('/eventos', async (req, res) => {
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE nome = VALUES(nome), preco = VALUES(preco)
         `;
-            await conexao.query(sql, [dados.nome, dados.preco]);
+            await conexao.query(sql, [dados.id, dados.nome, dados.preco]);
             console.log(`✅ Produto "${dados.nome}" espelhado no banco principal.`);
         } catch (erro) {
             console.error('Erro ao espelhar produto:', erro);
@@ -262,7 +264,7 @@ app.post('/sincronizar', async (req, res) => {
         // 1. Republica todos os produtos
         const [produtos] = await conexao.query('SELECT * FROM produtos');
         for (const produto of produtos) {
-            await axios.post('http://localhost:10000/eventos', {
+            await axios.post('http://barramento-service:10000/eventos', {
                 tipo: 'ProdutoCriado',
                 dados: produto
             }).catch(err => console.log('Erro ao publicar produto:', err.message));
@@ -275,7 +277,7 @@ app.post('/sincronizar', async (req, res) => {
                 'SELECT produto_id FROM itens_pedido WHERE pedido_id = ?',
                 [pedido.id]
             );
-            await axios.post('http://localhost:10000/eventos', {
+            await axios.post('http://barramento-service:10000/eventos', {
                 tipo: 'PedidoCriado',
                 dados: {
                     id: pedido.id,
@@ -295,5 +297,5 @@ app.post('/sincronizar', async (req, res) => {
 });
 
 app.listen(3000, () => {
-    console.log('Classificação. Porta 3000')
+    console.log('Criar_Pedido. Porta 3000')
 })
