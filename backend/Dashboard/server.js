@@ -9,7 +9,7 @@
  *      BD_DashBoard atualizado como um Read Model.
  *
  * Banco de dados: BD_DashBoard (exclusivo deste microsserviço)
- * Barramento:     http://localhost:10000
+ * Barramento:     http://barramento-service:10000
  * ============================================================================
  */
 
@@ -39,6 +39,7 @@ async function conectar() {
             user:     process.env.USERBD,
             password: process.env.PASSWORD,
             database: process.env.DATABASE,
+            charset:  'utf8mb4',
         });
         console.log('✅ Dashboard conectado ao MySQL (BD_DashBoard).');
     } catch (erro) {
@@ -60,16 +61,6 @@ app.get('/', (_req, res) => {
 // ENDPOINT: KPIs PRINCIPAIS
 // GET /dashboard/kpis
 // ============================================================================
-/**
- * Retorna as 4 métricas exibidas nos cards do topo do Dashboard:
- *   - totalPedidos     : quantidade total de pedidos registrados
- *   - entreguesHoje    : pedidos com status 'Entregue' cuja data_entrega é hoje
- *   - urgentesAberto   : pedidos com prioridade 1 ainda não entregues
- *   - totalProdutos    : quantidade de produtos no catálogo
- *
- * Resposta esperada pelo frontend (dashboardService.js):
- *   { totalPedidos, entreguesHoje, urgentesAberto, totalProdutos }
- */
 app.get('/dashboard/kpis', async (req, res) => {
     try {
         const sql = `
@@ -110,20 +101,8 @@ app.get('/dashboard/kpis', async (req, res) => {
 // ENDPOINT: VOLUME DIÁRIO DE PEDIDOS
 // GET /dashboard/volume-diario
 // ============================================================================
-/**
- * Retorna a quantidade de pedidos criados por dia nos últimos 7 dias
- * (incluindo hoje), alimentando o gráfico de área do Dashboard.
- *
- * Resposta esperada pelo frontend (dashboardService.js):
- *   [{ data: "DD/MM", pedidos: N }, ...]  — sempre 7 entradas
- *
- * ATENÇÃO — gap filling:
- *   A query só devolve dias que têm pedidos. O loop abaixo garante que
- *   todos os 7 dias apareçam no array, com pedidos = 0 nos dias vazios.
- */
 app.get('/dashboard/volume-diario', async (_req, res) => {
     try {
-        // 1. Busca contagem agrupada por dia nos últimos 7 dias
         const sql = `
         SELECT
             DATE_FORMAT(MIN(data_criacao), '%d/%m') AS data,
@@ -135,13 +114,11 @@ app.get('/dashboard/volume-diario', async (_req, res) => {
     `;
         const [linhas] = await conexao.query(sql);
 
-        // 2. Monta mapa { 'DD/MM': N } com o que veio do banco
         const mapa = {};
         linhas.forEach(({ data, pedidos }) => {
             mapa[data] = Number(pedidos);
         });
 
-        // 3. Gera o array completo dos 7 dias — preenche com 0 os dias sem pedidos
         const resultado = [];
         for (let diasAtras = 6; diasAtras >= 0; diasAtras--) {
             const d = new Date();
@@ -162,19 +139,6 @@ app.get('/dashboard/volume-diario', async (_req, res) => {
 // ENDPOINT: PRODUTOS MAIS PEDIDOS
 // GET /dashboard/produtos-mais-pedidos
 // ============================================================================
-/**
- * Retorna o Top 5 de produtos com maior volume vendido,
- * alimentando o gráfico de barras horizontal do Dashboard.
- *
- * Resposta esperada pelo frontend (dashboardService.js):
- *   [{ nome: string, pedidos: number }, ...]  — até 5 entradas
- *
- * Lógica:
- *   - Soma a quantidade de itens_pedido agrupada por produto_id
- *   - Faz JOIN com produtos para obter o nome
- *   - Ordena do maior para o menor volume
- *   - Limita a 5 registros (limite definido no GraficoProdutos.jsx)
- */
 app.get('/dashboard/produtos-mais-pedidos', async (_req, res) => {
     try {
         const sql = `
@@ -189,7 +153,6 @@ app.get('/dashboard/produtos-mais-pedidos', async (_req, res) => {
         `;
         const [linhas] = await conexao.query(sql);
 
-        // Garante que pedidos seja sempre número
         const resultado = linhas.map(({ nome, pedidos }) => ({
             nome,
             pedidos: Number(pedidos),
@@ -207,15 +170,6 @@ app.get('/dashboard/produtos-mais-pedidos', async (_req, res) => {
 // RECEPTOR DE EVENTOS DO BARRAMENTO
 // POST /eventos
 // ============================================================================
-/**
- * Recebe eventos publicados pelo Barramento (porta 10000) e atualiza
- * o Read Model (BD_DashBoard) de forma assíncrona.
- *
- * Eventos tratados:
- *   ProdutoCriado  → insere/atualiza produto no catálogo local
- *   PedidoCriado   → insere pedido + itens_pedido
- *   PedidoMovido   → atualiza status (e data_entrega se 'Entregue')
- */
 app.post('/eventos', async (req, res) => {
     // Responde imediatamente para não bloquear o Barramento
     res.status(200).json({ msg: 'ok' });
@@ -240,7 +194,6 @@ app.post('/eventos', async (req, res) => {
         // PedidoCriado — registra o pedido e seus itens
         // ------------------------------------------------------------------
         else if (tipo === 'PedidoCriado') {
-            // 1. Insere cabeçalho do pedido
             const sqlPedido = `
                 INSERT INTO pedidos (id, responsavel, status, prioridade, data_criacao)
                 VALUES (?, ?, ?, ?, NOW())
@@ -253,7 +206,6 @@ app.post('/eventos', async (req, res) => {
                 dados.prioridade ?? 3,
             ]);
 
-            // 2. Insere itens do pedido (se houver)
             if (Array.isArray(dados.produtosIds) && dados.produtosIds.length > 0) {
                 const itens = dados.produtosIds.map(produtoId => [dados.id, produtoId, 1]);
                 await conexao.query(
