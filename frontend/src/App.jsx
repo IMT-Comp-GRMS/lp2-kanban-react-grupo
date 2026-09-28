@@ -1,35 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import CardPedido from './CardPedido';
-
-/* ==========================================================================
-   1. IMPORTAÇÕES DE GERENCIAMENTO DE ESTADO (REDUX)
-   ========================================================================== */
-// useSelector: Hook para ler dados armazenados no estado global.
-// useDispatch: Hook para disparar ações que alteram o estado global.
 import { useSelector, useDispatch } from 'react-redux';
 import { salvarPedidosNoCofre } from './store/pedidosSlice';
 
-/**
- * Componente Principal da Aplicação Kanban - Velato
- * Responsável por renderizar a interface de colunas, orquestrar o estado
- * global dos pedidos e gerenciar a interface de criação de novas tarefas.
- */
-const App = () => {
-  /* ==========================================================================
-     2. INICIALIZAÇÃO DE ESTADOS (REDUX E REACT HOOKS)
-     ========================================================================== */
-  const dispatch = useDispatch();
+/* ==========================================================================
+   URLS DA API — Kubernetes (NodePort)
+   ========================================================================== */
+const URL_CRIAR_PEDIDO = 'http://localhost:30991';       // era :3000
+const URL_CONFIGURAR_PRODUTO = 'http://localhost:32358';  // era :3001
 
-  // Acesso ao estado global: extrai a lista de pedidos gerenciada pelo Redux.
+const App = () => {
+  const dispatch = useDispatch();
   const pedidos = useSelector((state) => state.pedidos.lista);
 
-  // Estados locais: utilizados exclusivamente para o controle do formulário
-  // de criação de pedido e visibilidade do modal.
-  const [catalogo, setCatalogo] = useState([]); // Guarda as calças vindas do banco
-  const [produtosSelecionados, setProdutosSelecionados] = useState([]); // Guarda os IDs marcados
+  const [catalogo, setCatalogo] = useState([]);
+  const [produtosSelecionados, setProdutosSelecionados] = useState([]);
   const [descricao, setDescricao] = useState('');
   const [responsavel, setResponsavel] = useState('');
-  const [prioridade, setPrioridade] = useState(3); // Inicializa com prioridade Baixa (3)
+  const [prioridade, setPrioridade] = useState(3);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
   const [filtroPrioridade, setFiltroPrioridade] = useState('TODAS');
@@ -37,10 +25,6 @@ const App = () => {
   const [nomeProduto, setNomeProduto] = useState('');
   const [precoProduto, setPrecoProduto] = useState('');
 
-  /* ==========================================================================
-     3. DEFINIÇÃO DE ESTILOS INLINE (CSS-in-JS) - IDENTIDADE VELATO
-     ========================================================================== */
-  // Container master que engloba toda a aplicação.
   const containerStyle = {
     backgroundColor: '#f6f0e7',
     fontFamily: "'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -50,7 +34,6 @@ const App = () => {
     color: '#252623'
   };
 
-  // Estilo do cabeçalho de navegação superior.
   const headerVelatoStyle = {
     backgroundColor: '#f6f0e7',
     padding: '20px 40px',
@@ -61,7 +44,6 @@ const App = () => {
     marginBottom: '30px'
   };
 
-  // Estilo padronizado para o botão primário de ação (Call to Action).
   const botãoCriarPedido = {
     padding: '10px 24px',
     backgroundColor: '#ae4f48',
@@ -92,7 +74,6 @@ const App = () => {
     gap: '8px'
   };
 
-  // Container que abriga o grid do Kanban, permitindo rolagem horizontal caso necessário.
   const kanbanContainerStyle = {
     display: 'flex',
     gap: '24px',
@@ -102,12 +83,11 @@ const App = () => {
     overflowX: 'auto'
   };
 
-  // Container estrutural de cada coluna do Kanban. Define altura fixa para habilitar o scroll.
   const colunaStyle = {
     backgroundColor: '#ffffff',
     flex: 1,
     minWidth: '260px',
-    height: '75vh', // Limita a altura da coluna em 75% da janela
+    height: '75vh',
     borderRadius: '6px',
     overflow: 'hidden',
     display: 'flex',
@@ -115,7 +95,6 @@ const App = () => {
     border: '1px solid #e5e7eb'
   };
 
-  // Configuração semântica e visual das colunas do sistema.
   const colunas = [
     { titulo: 'Pedidos', cor: '#3c5262' },
     { titulo: 'Pagamento Confirmado', cor: '#a79261' },
@@ -124,7 +103,6 @@ const App = () => {
     { titulo: 'Pedido Entregue', cor: '#3c5262' },
   ];
 
-  // Estilo da sobreposição escura atrás do modal.
   const modalOverlayStyle = {
     position: 'fixed',
     top: 0,
@@ -138,7 +116,6 @@ const App = () => {
     zIndex: 1000
   };
 
-  // Estilo da caixa branca principal do modal.
   const modalContentStyle = {
     backgroundColor: '#f6f0e7',
     padding: '30px',
@@ -150,7 +127,6 @@ const App = () => {
     border: '1px solid #3c5262'
   };
 
-  // Estilo genérico para inputs textuais e seletores do formulário.
   const inputStyle = {
     padding: '12px',
     borderRadius: '4px',
@@ -161,17 +137,9 @@ const App = () => {
     fontSize: '14px'
   };
 
-  /* ==========================================================================
-     4. INTEGRAÇÃO COM A API E LÓGICA DE NEGÓCIO
-     ========================================================================== */
-
-  /**
-   * Executa uma requisição GET ao Backend para obter a lista atualizada
-   * de pedidos e os insere no estado global (Redux).
-   */
   const carregarPedidos = async () => {
     try {
-      const response = await fetch('http://localhost:3000/tarefas');
+      const response = await fetch(`${URL_CRIAR_PEDIDO}/tarefas`);
       const data = await response.json();
       dispatch(salvarPedidosNoCofre(data));
     } catch (error) {
@@ -181,7 +149,7 @@ const App = () => {
 
   const carregarCatalogo = async () => {
     try {
-      const response = await fetch('http://localhost:3001/produtos');
+      const response = await fetch(`${URL_CONFIGURAR_PRODUTO}/produtos`);
       const data = await response.json();
       setCatalogo(data);
     } catch (error) {
@@ -189,7 +157,6 @@ const App = () => {
     }
   };
 
-  // useEffect: Aciona o carregamento inicial dos pedidos assim que o App é montado na tela.
   useEffect(() => {
     carregarPedidos();
     carregarCatalogo();
@@ -198,15 +165,11 @@ const App = () => {
   const toggleProduto = (idProduto) => {
     setProdutosSelecionados(prev =>
       prev.includes(idProduto)
-        ? prev.filter(id => id !== idProduto) // Se já tem, tira
-        : [...prev, idProduto] // Se não tem, coloca
+        ? prev.filter(id => id !== idProduto)
+        : [...prev, idProduto]
     );
   };
 
-  /**
-   * Coleta os dados do formulário de produto e envia via POST
-   * para o servidor persistir um novo produto no banco de dados.
-   */
   const handleCriarProduto = async () => {
     if (!nomeProduto || !precoProduto) {
       alert("Preencha o nome e o preço do produto.");
@@ -216,7 +179,7 @@ const App = () => {
     const novoProduto = { nome: nomeProduto, preco: parseFloat(precoProduto) };
 
     try {
-      const response = await fetch('http://localhost:3001/produtos', {
+      const response = await fetch(`${URL_CONFIGURAR_PRODUTO}/produtos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(novoProduto)
@@ -226,7 +189,7 @@ const App = () => {
         setMostrarModalProduto(false);
         setNomeProduto('');
         setPrecoProduto('');
-        carregarCatalogo(); // Atualiza o catálogo no modal de pedidos
+        carregarCatalogo();
       }
     } catch (error) {
       console.error("Erro ao criar produto:", error);
@@ -234,27 +197,21 @@ const App = () => {
     }
   };
 
-  /**
-   * Coleta os dados do formulário local, compila o payload e envia via POST
-   * para o servidor persistir um novo pedido no banco de dados.
-   */
   const handleCriarPedido = async () => {
-    // 1. Trava de segurança: não deixa enviar sem escolher a calça
     if (produtosSelecionados.length === 0) {
       alert("Por favor, selecione pelo menos um produto para o pedido.");
       return;
     }
 
-    // 2. Montamos o pacote com o array de IDs
     const novoPedido = {
       descricao,
       responsavel,
       prioridade,
-      produtosIds: produtosSelecionados // NOVIDADE AQUI!
+      produtosIds: produtosSelecionados
     };
 
     try {
-      const response = await fetch('http://localhost:3000/tarefas', {
+      const response = await fetch(`${URL_CRIAR_PEDIDO}/tarefas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(novoPedido)
@@ -262,7 +219,6 @@ const App = () => {
 
       if (response.ok) {
         setMostrarModal(false);
-        // Limpamos tudo após o sucesso, incluindo os checkboxes
         setDescricao(''); setResponsavel(''); setPrioridade(3); setProdutosSelecionados([]);
         carregarPedidos();
       }
@@ -272,20 +228,14 @@ const App = () => {
     }
   };
 
-  /* ==========================================================================
-     5. RENDERIZAÇÃO DA INTERFACE (JSX)
-     ========================================================================== */
   return (
     <div style={containerStyle}>
 
-      {/* --- BLOCO DO MODAL DE CRIAÇÃO DE PEDIDO --- */}
-      {/* A renderização condicional baseia-se no estado boolean 'mostrarModal' */}
       {mostrarModal && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <h3 style={{ margin: '0 0 10px 0' }}>Novo Pedido - Velato</h3>
 
-            {/* --- LISTA DE PRODUTOS (CHECKBOXES) --- */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid #a79261', padding: '12px', borderRadius: '4px', backgroundColor: '#ffffff', maxHeight: '180px', overflowY: 'auto' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#3c5262' }}>SELECIONE OS PRODUTOS:</label>
 
@@ -320,7 +270,6 @@ const App = () => {
               style={inputStyle}
             />
 
-            {/* Componente de seleção de prioridade numérica */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#3c5262' }}>PRIORIDADE:</label>
               <select
@@ -334,7 +283,6 @@ const App = () => {
               </select>
             </div>
 
-            {/* Controles de submissão do formulário */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <button
                 onClick={handleCriarPedido}
@@ -353,8 +301,6 @@ const App = () => {
         </div>
       )}
 
-      {/* --- BLOCO DO MODAL DE CONFIGURAÇÃO DE PRODUTO --- */}
-      {/* A renderização condicional baseia-se no estado boolean 'mostrarModalProduto' */}
       {mostrarModalProduto && (
         <div style={modalOverlayStyle}>
           <div style={{ ...modalContentStyle, width: '320px' }}>
@@ -375,7 +321,6 @@ const App = () => {
               style={inputStyle}
             />
 
-            {/* Controles de submissão do formulário de produto */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <button
                 onClick={handleCriarProduto}
@@ -394,7 +339,6 @@ const App = () => {
         </div>
       )}
 
-      {/* --- BLOCO DO CABEÇALHO (HEADER) --- */}
       <header style={headerVelatoStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: '800', margin: 0, color: '#252623', letterSpacing: '2px' }}>
@@ -405,10 +349,8 @@ const App = () => {
           </span>
         </div>
 
-        {/* Botões de ação do cabeçalho */}
         <div style={{ display: 'flex', gap: '12px' }}>
 
-          {/* Navega para o frontend do Dashboard */}
           <button
             style={{
               padding: '10px 24px',
@@ -428,12 +370,10 @@ const App = () => {
             📊 Ir para o Dashboard
           </button>
 
-          {/* Aciona a visibilidade do formulário de configuração de produto */}
           <button style={botãoConfigurarProduto} onClick={() => setMostrarModalProduto(true)}>
             <span style={{ fontSize: '18px', fontWeight: '400' }}>+</span> Configurar Produto
           </button>
 
-          {/* Aciona a visibilidade do formulário de criação de pedido */}
           <button style={botãoCriarPedido} onClick={() => setMostrarModal(true)}>
             <span style={{ fontSize: '18px', fontWeight: '400' }}>+</span> Novo Pedido
           </button>
@@ -474,13 +414,10 @@ const App = () => {
         )}
       </div>
 
-      {/* --- BLOCO DO GRID DE COLUNAS (KANBAN) --- */}
       <div style={kanbanContainerStyle}>
-        {/* Mapeia o array estrutural de colunas gerando a interface dinamicamente */}
         {colunas.map((col, index) => (
           <div key={index} style={colunaStyle}>
 
-            {/* Título Fixo da Coluna */}
             <div style={{
               padding: '15px',
               textAlign: 'center',
@@ -494,10 +431,8 @@ const App = () => {
               {col.titulo}
             </div>
 
-            {/* Container Dinâmico de Cards. Garante renderização isolada e barra de rolagem (overflowY) independente. */}
             <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, overflowY: 'auto' }}>
 
-              {/* --- O FUNIL DE DADOS ENTRA AQUI --- */}
               {pedidos
                 .filter((pedido) => pedido.status === col.titulo)
                 .filter((pedido) => {

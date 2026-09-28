@@ -3,11 +3,11 @@
  * CAMADA DE DADOS - Dashboard Velato
  * ============================================================================
  * Cada função exportada busca um conjunto de dados do microsserviço
- * Dashboard rodando em http://localhost:4000
+ * Dashboard rodando no Kubernetes (Service dashboard-service, NodePort)
  * ============================================================================
  */
 
-const BASE_URL = 'http://localhost:4000';
+const BASE_URL = 'http://localhost:30795'; // era :4000
 
 /**
  * Busca os KPIs principais para os cards do topo.

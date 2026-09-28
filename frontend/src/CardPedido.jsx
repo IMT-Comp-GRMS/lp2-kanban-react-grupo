@@ -2,36 +2,37 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { salvarPedidosNoCofre } from './store/pedidosSlice';
 
+/* ==========================================================================
+   URLS DA API — Kubernetes (NodePort)
+   ========================================================================== */
+const URL_CRIAR_PEDIDO = 'http://localhost:30991'; // era :3000
+const URL_HISTORICO = 'http://localhost:30946';    // era :5001
+
 const CardPedido = ({ pedido }) => {
   const dispatch = useDispatch();
 
-  // Estado para controlar a visibilidade e os dados do histórico
   const [historico, setHistorico] = useState([]);
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
-  // 1. Definição da ordem das colunas (Igual ao que está no App.jsx)
   const ordemColunas = [
-    'Pedidos', 
-    'Pagamento Confirmado', 
-    'Pedido separado', 
-    'Pedido Enviado', 
+    'Pedidos',
+    'Pagamento Confirmado',
+    'Pedido separado',
+    'Pedido Enviado',
     'Pedido Entregue'
   ];
 
-  // 2. Função para atualizar o status no Backend
   const atualizarStatus = async (novoStatus) => {
     try {
-      const response = await fetch(`http://localhost:3000/tarefas/${pedido.id}`, {
+      const response = await fetch(`${URL_CRIAR_PEDIDO}/tarefas/${pedido.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        // Envia também o status_anterior para o histórico
         body: JSON.stringify({ status: novoStatus, status_anterior: pedido.status })
       });
 
       if (response.ok) {
-        // Após atualizar no banco, buscamos a lista nova para atualizar o Redux
-        const resLista = await fetch('http://localhost:3000/tarefas');
+        const resLista = await fetch(`${URL_CRIAR_PEDIDO}/tarefas`);
         const listaAtualizada = await resLista.json();
         dispatch(salvarPedidosNoCofre(listaAtualizada));
       }
@@ -40,9 +41,7 @@ const CardPedido = ({ pedido }) => {
     }
   };
 
-  // 3. Função para buscar o histórico do pedido
   const handleVerHistorico = async () => {
-    // Se já está aberto, fecha
     if (mostrarHistorico) {
       setMostrarHistorico(false);
       return;
@@ -50,8 +49,8 @@ const CardPedido = ({ pedido }) => {
 
     setCarregandoHistorico(true);
     try {
-      const response = await fetch(`http://localhost:5001/historico/${pedido.id}`);
-      
+      const response = await fetch(`${URL_HISTORICO}/historico/${pedido.id}`);
+
       if (response.ok) {
         const data = await response.json();
         setHistorico(data);
@@ -66,7 +65,6 @@ const CardPedido = ({ pedido }) => {
     setMostrarHistorico(true);
   };
 
-  // 4. Lógica dos botões
   const indexAtual = ordemColunas.indexOf(pedido.status);
 
   const handleAvancar = () => {
@@ -82,16 +80,14 @@ const CardPedido = ({ pedido }) => {
   };
 
   const handleExcluir = async () => {
-    // Uma confirmação simples para evitar cliques acidentais
     if (window.confirm(`Tem certeza que deseja excluir o pedido "${pedido.titulo}"?`)) {
       try {
-        const response = await fetch(`http://localhost:3000/tarefas/${pedido.id}`, {
+        const response = await fetch(`${URL_CRIAR_PEDIDO}/tarefas/${pedido.id}`, {
           method: 'DELETE',
         });
 
         if (response.ok) {
-          // Atualiza o Redux buscando a lista nova (igual fazemos no mover)
-          const resLista = await fetch('http://localhost:3000/tarefas');
+          const resLista = await fetch(`${URL_CRIAR_PEDIDO}/tarefas`);
           const listaAtualizada = await resLista.json();
           dispatch(salvarPedidosNoCofre(listaAtualizada));
         }
@@ -101,19 +97,16 @@ const CardPedido = ({ pedido }) => {
     }
   };
 
-  // 5. Estilos Minimalistas Velato
-  // Mapeamento de cores da Velato para prioridades
   const coresPrioridade = {
-    1: '#ae4f48', // Alta - Vermelho
-    2: '#a79261', // Média - Mostarda
-    3: '#3c5262'  // Baixa - Azure/Cinza
+    1: '#ae4f48',
+    2: '#a79261',
+    3: '#3c5262'
   };
 
   const cardStyle = {
     backgroundColor: '#FFFFFF',
     padding: '15px',
     borderRadius: '4px',
-    // Adiciona a borda colorida na esquerda baseada na prioridade
     borderLeft: `6px solid ${coresPrioridade[pedido.prioridade] || '#3c5262'}`,
     borderBottom: '1px solid #E5E7EB',
     borderRight: '1px solid #E5E7EB',
@@ -139,8 +132,7 @@ const CardPedido = ({ pedido }) => {
 
   return (
     <div style={cardStyle}>
-      {/* 1. O BOTÃO DE EXCLUIR ENTRA AQUI NO TOPO */}
-      <button 
+      <button
         onClick={handleExcluir}
         style={{
           position: 'absolute',
@@ -158,7 +150,6 @@ const CardPedido = ({ pedido }) => {
         🗑️
       </button>
 
-      {/* 2. CONTEÚDO DO CARD */}
       <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#071227' }}>
         ID: {pedido.id}
       </div>
@@ -166,32 +157,30 @@ const CardPedido = ({ pedido }) => {
       <div style={{ fontWeight: '700', fontSize: '14px', paddingRight: '20px' }}>
         {pedido.titulo}
       </div>
-      
+
       <div style={{ fontSize: '12px', color: '#6B7280' }}>
         {pedido.descricao}
       </div>
-      
+
       <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#a79261' }}>
         Responsável: {pedido.responsavel}
       </div>
 
-      {/* 3. BOTÕES DE NAVEGAÇÃO NO RODAPÉ DO CARD */}
       <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
         {indexAtual > 0 && (
           <button onClick={handleVoltar} style={botaoStyle}> ⬅ Voltar </button>
         )}
-        
+
         {indexAtual < ordemColunas.length - 1 && (
-          <button 
-            onClick={handleAvancar} 
+          <button
+            onClick={handleAvancar}
             style={{ ...botaoStyle, backgroundColor: '#3c5262', color: '#f6f0e7' }}
-          > 
-            Avançar ➡ 
+          >
+            Avançar ➡
           </button>
         )}
       </div>
 
-      {/* 4. BOTÃO VER HISTÓRICO */}
       <button
         onClick={handleVerHistorico}
         style={{
@@ -205,7 +194,6 @@ const CardPedido = ({ pedido }) => {
         {carregandoHistorico ? 'Carregando...' : mostrarHistorico ? '▲ Fechar Histórico' : '📋 Ver Histórico'}
       </button>
 
-      {/* 5. TABELA DE HISTÓRICO */}
       {mostrarHistorico && (
         <div style={{ marginTop: '5px' }}>
           {historico.length === 0 ? (
