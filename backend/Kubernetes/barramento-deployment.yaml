@@ -14,7 +14,8 @@ spec:
     spec:
       containers:
         - name: barramento
-          image: SEU_USUARIO_DOCKERHUB/barramento
+          image: barramento
+          imagePullPolicy: Never
           ports:
             - containerPort: 10000
 ---
@@ -25,10 +26,8 @@ metadata:
 spec:
   selector:
     app: barramento
-  #ip interno ao cluster
   type: ClusterIP
   ports:
-    - name: barramento
-      protocol: TCP
+    - protocol: TCP
       port: 10000
       targetPort: 10000
