@@ -184,6 +184,9 @@ class _KanbanScreenState extends State<KanbanScreen> {
   }
 
   void _mostrarDialogo(BuildContext context) {
+    final nomeController = TextEditingController();
+    final precoController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -191,15 +194,28 @@ class _KanbanScreenState extends State<KanbanScreen> {
           title: const Text('Configurar Produto'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              TextField(decoration: InputDecoration(labelText: 'Nome do produto')),
-              TextField(decoration: InputDecoration(labelText: 'Preço (ex: 199.90)')),
+            children: [
+              TextField(
+                controller: nomeController,
+                decoration: const InputDecoration(labelText: 'Nome do produto'),
+              ),
+              TextField(
+                controller: precoController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Preço (ex: 199.90)'),
+              ),
             ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                final nome = nomeController.text.trim();
+                final preco = double.tryParse(precoController.text.replaceAll(',', '.')) ?? 0.0;
+                if (nome.isEmpty || preco <= 0) return;
+                Navigator.pop(context);
+                criarProduto(nome, preco);
+              },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E1172), foregroundColor: Colors.white),
               child: const Text('Adicionar')
             ),
