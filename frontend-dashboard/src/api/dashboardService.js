@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-const BASE_URL = 'http://localhost:30795'; // era :4000
+const BASE_URL = 'http://localhost:4000'; // via kubectl port-forward svc/dashboard-service 4000:4000
 
 /**
  * Busca os KPIs principais para os cards do topo.
