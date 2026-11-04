@@ -591,6 +591,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                       itemBuilder: (context, i) {
                                         final pedido = itensDaColuna[i];
                                         return CardPedidoWidget(
+                                          key: ValueKey(pedido['id']),
                                           pedido: pedido,
                                           onVoltar: index > 0
                                               ? () => moverPedido(pedido, colunas[index - 1]['titulo'])
@@ -672,7 +673,7 @@ class CardProdutoWidget extends StatelessWidget {
   }
 }
 
-class CardPedidoWidget extends StatelessWidget {
+class CardPedidoWidget extends StatefulWidget {
   final dynamic pedido;
   // null quando o pedido já está na primeira/última coluna
   final VoidCallback? onVoltar;
@@ -692,9 +693,52 @@ class CardPedidoWidget extends StatelessWidget {
   };
 
   @override
+  State<CardPedidoWidget> createState() => _CardPedidoWidgetState();
+}
+
+class _CardPedidoWidgetState extends State<CardPedidoWidget> {
+  // Microsserviço Histórico (kubectl port-forward svc/historico-service 5001:5001)
+  static const String historicoUrl = 'http://localhost:5001';
+
+  List<dynamic> historico = [];
+  bool mostrarHistorico = false;
+  bool carregandoHistorico = false;
+
+  // GET /historico/:pedido_id (igual ao handleVerHistorico do CardPedido.jsx)
+  Future<void> alternarHistorico() async {
+    if (mostrarHistorico) {
+      setState(() => mostrarHistorico = false);
+      return;
+    }
+
+    setState(() => carregandoHistorico = true);
+    List<dynamic> dados = [];
+    try {
+      final resposta = await http.get(
+        Uri.parse('$historicoUrl/historico/${widget.pedido['id']}'),
+      );
+      // O serviço responde 404 quando o pedido ainda não tem movimentações
+      if (resposta.statusCode == 200) {
+        dados = jsonDecode(utf8.decode(resposta.bodyBytes));
+      }
+    } catch (e) {
+      dados = [];
+    }
+    if (!mounted) return;
+    setState(() {
+      historico = dados;
+      carregandoHistorico = false;
+      mostrarHistorico = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final pedido = widget.pedido;
+    final onVoltar = widget.onVoltar;
+    final onAvancar = widget.onAvancar;
     final int prioridade = (pedido['prioridade'] as num?)?.toInt() ?? 3;
-    final Color corBorda = coresPrioridade[prioridade] ?? const Color(0xFF3C5262);
+    final Color corBorda = CardPedidoWidget.coresPrioridade[prioridade] ?? const Color(0xFF3C5262);
     final String descricao = pedido['descricao']?.toString() ?? '';
 
     return Container(
@@ -789,7 +833,113 @@ class CardPedidoWidget extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: carregandoHistorico ? null : alternarHistorico,
+              icon: Icon(
+                mostrarHistorico ? Icons.keyboard_arrow_up : Icons.assignment_outlined,
+                size: 14,
+              ),
+              label: Text(
+                carregandoHistorico
+                    ? 'Carregando...'
+                    : mostrarHistorico
+                        ? 'Fechar Histórico'
+                        : 'Ver Histórico',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: mostrarHistorico ? const Color(0xFFF6F0E7) : const Color(0xFFA79261),
+                backgroundColor: mostrarHistorico ? const Color(0xFFA79261) : Colors.transparent,
+                side: const BorderSide(color: Color(0xFFA79261)),
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                minimumSize: const Size(0, 30),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+          ),
+          if (mostrarHistorico) ...[
+            const SizedBox(height: 5),
+            if (historico.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: Text(
+                    'Nenhuma movimentação registrada.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                ),
+              )
+            else
+              Table(
+                columnWidths: const {
+                  0: FlexColumnWidth(3),
+                  1: FlexColumnWidth(3),
+                  2: FlexColumnWidth(3),
+                },
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                children: [
+                  const TableRow(
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF6F0E7),
+                      border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+                    ),
+                    children: [
+                      _CelulaHistorico('De', cor: Color(0xFF3C5262), negrito: true),
+                      _CelulaHistorico('Para', cor: Color(0xFF3C5262), negrito: true),
+                      _CelulaHistorico('Data/Hora', cor: Color(0xFF3C5262), negrito: true),
+                    ],
+                  ),
+                  for (final linha in historico)
+                    TableRow(
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFF6F0E7))),
+                      ),
+                      children: [
+                        _CelulaHistorico(
+                          linha['status_anterior']?.toString() ?? '—',
+                          cor: const Color(0xFFAE4F48),
+                        ),
+                        _CelulaHistorico(
+                          linha['status_novo']?.toString() ?? '',
+                          cor: const Color(0xFF3C5262),
+                        ),
+                        _CelulaHistorico(
+                          linha['data_hora']?.toString() ?? '',
+                          cor: const Color(0xFF6B7280),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// Célula da tabela de histórico do card
+class _CelulaHistorico extends StatelessWidget {
+  final String texto;
+  final Color cor;
+  final bool negrito;
+
+  const _CelulaHistorico(this.texto, {required this.cor, this.negrito = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(5),
+      child: Text(
+        texto,
+        style: TextStyle(
+          fontSize: 11,
+          color: cor,
+          fontWeight: negrito ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }
