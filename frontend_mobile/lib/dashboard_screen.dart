@@ -90,7 +90,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    final margemTopo = MediaQuery.of(context).size.width >= 900 ? 40.0 : 16.0;
+    final larguraTela = MediaQuery.of(context).size.width;
+    final margemTopo = larguraTela >= 900 ? 40.0 : 16.0;
+    final telaEstreita = larguraTela < 500;
 
     return Scaffold(
       backgroundColor: _fundo,
@@ -107,22 +109,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         title: Row(
           children: [
-            const Text(
-              'VELATO',
-              style: TextStyle(
-                color: _preto,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2.0,
-                fontSize: 28,
+            // Diminui sozinho se faltar espaço (celulares pequenos)
+            Flexible(
+              flex: 2,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'VELATO',
+                  style: TextStyle(
+                    color: _preto,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.0,
+                    fontSize: telaEstreita ? 22 : 28,
+                  ),
+                ),
               ),
             ),
             Container(
-              margin: const EdgeInsets.only(left: 15, right: 10),
+              margin: EdgeInsets.only(left: telaEstreita ? 10 : 15, right: 10),
               height: 24,
               width: 1,
               color: _azul,
             ),
-            const Text('Dashboard', style: TextStyle(color: _dourado, fontSize: 18)),
+            Flexible(
+              child: Text(
+                'Dashboard',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: _dourado, fontSize: telaEstreita ? 16 : 18),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -132,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: OutlinedButton.styleFrom(
               foregroundColor: _azul,
               side: const BorderSide(color: _azul),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: telaEstreita ? 12 : 20, vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             ),
             label: const Text(

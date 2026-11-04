@@ -443,8 +443,65 @@ class _KanbanScreenState extends State<KanbanScreen> {
     );
   }
 
+  // Celular: os 3 botões do topo ficam só com ícone (o nome aparece ao segurar)
+  List<Widget> _botoesCompactos(BuildContext context) {
+    Widget botao({
+      required String dica,
+      required IconData icone,
+      required VoidCallback onPressed,
+      Color? fundo,
+      Color corIcone = Colors.white,
+      BorderSide? borda,
+    }) {
+      return Tooltip(
+        message: dica,
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            backgroundColor: fundo,
+            side: borda,
+            minimumSize: const Size(40, 40),
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          ),
+          child: Icon(icone, color: corIcone, size: 20),
+        ),
+      );
+    }
+
+    return [
+      botao(
+        dica: 'Dashboard',
+        icone: Icons.bar_chart,
+        corIcone: const Color(0xFF3C5262),
+        borda: const BorderSide(color: Color(0xFF3C5262), width: 2),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        ),
+      ),
+      const SizedBox(width: 8),
+      botao(
+        dica: 'Configurar Produto',
+        icone: Icons.inventory_2_outlined,
+        fundo: const Color(0xFF2E1172),
+        onPressed: () => _mostrarDialogo(context),
+      ),
+      const SizedBox(width: 8),
+      botao(
+        dica: 'Novo Pedido',
+        icone: Icons.add,
+        fundo: const Color(0xFFAE4F48),
+        onPressed: () => _mostrarModalPedido(context),
+      ),
+      const SizedBox(width: 12),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final larguraTela = MediaQuery.of(context).size.width;
+    final telaEstreita = larguraTela < 800;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFFF6F0E7),
@@ -455,31 +512,42 @@ class _KanbanScreenState extends State<KanbanScreen> {
         ),
         title: Row(
           children: [
-            const Text(
-              'VELATO',
-              style: TextStyle(
-                color: Color(0xFF252623),
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2.0,
-                fontSize: 22,
+            // Diminui sozinho se faltar espaço (celulares pequenos)
+            const Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'VELATO',
+                  style: TextStyle(
+                    color: Color(0xFF252623),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.0,
+                    fontSize: 22,
+                  ),
+                ),
               ),
             ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 10),
-              height: 20,
-              width: 1,
-              color: const Color(0xFF3C5262),
-            ),
-            const Text(
-              'Configurar Produto',
-              style: TextStyle(
-                color: Color(0xFFA79261),
-                fontSize: 16,
+            if (larguraTela >= 500) ...[
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                height: 20,
+                width: 1,
+                color: const Color(0xFF3C5262),
               ),
-            ),
+              const Flexible(
+                child: Text(
+                  'Configurar Produto',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFFA79261),
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-       actions: [
+       actions: telaEstreita ? _botoesCompactos(context) : [
     OutlinedButton.icon(
       onPressed: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const DashboardScreen()),
