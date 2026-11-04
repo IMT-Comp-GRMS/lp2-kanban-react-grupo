@@ -32,8 +32,11 @@ class KanbanScreen extends StatefulWidget {
 
 class _KanbanScreenState extends State<KanbanScreen> {
   static const String baseUrl = 'http://localhost:3001';
+  // Serviço Criar_Pedido (pedidos do kanban)
+  static const String pedidosUrl = 'http://localhost:3000';
 
   List<dynamic> produtos = [];
+  List<dynamic> pedidos = [];
   bool carregando = true;
   String? mensagemErro;
 
@@ -64,17 +67,46 @@ class _KanbanScreenState extends State<KanbanScreen> {
         final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
         setState(() {
           produtos = dados;
-          carregando = false;
         });
       } else {
         setState(() {
           mensagemErro = 'Erro ao buscar produtos (${resposta.statusCode})';
           carregando = false;
         });
+        return;
       }
     } catch (e) {
       setState(() {
         mensagemErro = 'Não foi possível conectar ao backend.';
+        carregando = false;
+      });
+      return;
+    }
+
+    await buscarPedidos();
+  }
+
+  // GET /tarefas (pedidos do kanban)
+  Future<void> buscarPedidos() async {
+    try {
+      final resposta = await http.get(Uri.parse('$pedidosUrl/tarefas'));
+      if (!mounted) return;
+      if (resposta.statusCode == 200) {
+        final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
+        setState(() {
+          pedidos = dados;
+          carregando = false;
+        });
+      } else {
+        setState(() {
+          mensagemErro = 'Erro ao buscar pedidos (${resposta.statusCode})';
+          carregando = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        mensagemErro = 'Não foi possível conectar ao serviço de pedidos ($pedidosUrl).';
         carregando = false;
       });
     }
@@ -342,7 +374,11 @@ class _KanbanScreenState extends State<KanbanScreen> {
                     itemCount: colunas.length,
                     itemBuilder: (context, index) {
                       final coluna = colunas[index];
-                      final itensDaColuna = index == 0 ? produtos : [];
+                      final itensDaColuna = pedidos
+                          .where((p) => p['status'] == coluna['titulo'])
+                          .toList()
+                        ..sort((a, b) => ((a['prioridade'] ?? 3) as num)
+                            .compareTo((b['prioridade'] ?? 3) as num));
 
                       return Container(
                         width: 300,
@@ -377,7 +413,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                   ? Center(
                                       child: Text(
                                         index == 0
-                                            ? 'Nenhum produto cadastrado'
+                                            ? 'Nenhum pedido cadastrado'
                                             : 'Sem itens nesta etapa',
                                         style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                                       ),
@@ -386,7 +422,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                       padding: const EdgeInsets.all(12),
                                       itemCount: itensDaColuna.length,
                                       itemBuilder: (context, i) {
-                                        return CardProdutoWidget(produto: itensDaColuna[i]);
+                                        return CardPedidoWidget(pedido: itensDaColuna[i]);
                                       },
                                     ),
                             ),
@@ -452,6 +488,73 @@ class CardProdutoWidget extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: Color(0xFFAE4F48),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CardPedidoWidget extends StatelessWidget {
+  final dynamic pedido;
+
+  const CardPedidoWidget({super.key, required this.pedido});
+
+  static const Map<int, Color> coresPrioridade = {
+    1: Color(0xFFAE4F48),
+    2: Color(0xFFA79261),
+    3: Color(0xFF3C5262),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final int prioridade = (pedido['prioridade'] as num?)?.toInt() ?? 3;
+    final Color corBorda = coresPrioridade[prioridade] ?? const Color(0xFF3C5262);
+    final String descricao = pedido['descricao']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          left: BorderSide(color: corBorda, width: 6),
+          top: BorderSide(color: Colors.grey.shade300),
+          right: BorderSide(color: Colors.grey.shade300),
+          bottom: BorderSide(color: Colors.grey.shade300),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ID: ${pedido['id']}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF071227),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            pedido['titulo']?.toString() ?? 'Pedido',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          if (descricao.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              descricao,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            'Responsável: ${pedido['responsavel'] ?? ''}',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFA79261),
             ),
           ),
         ],
