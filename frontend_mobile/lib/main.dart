@@ -112,6 +112,53 @@ class _KanbanScreenState extends State<KanbanScreen> {
     }
   }
 
+  // POST /tarefas (novo pedido)
+  Future<void> criarPedido({
+    required String descricao,
+    required String responsavel,
+    required int prioridade,
+    required List<int> produtosIds,
+  }) async {
+    try {
+      final resposta = await http.post(
+        Uri.parse('$pedidosUrl/tarefas'),
+        headers: {'Content-Type': 'application/json; charset=utf-8'},
+        body: jsonEncode({
+          'descricao': descricao,
+          'responsavel': responsavel,
+          'prioridade': prioridade,
+          'produtosIds': produtosIds,
+        }),
+      );
+
+      if (!mounted) return;
+      if (resposta.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido criado com sucesso!'),
+            backgroundColor: Color(0xFF3C5262),
+          ),
+        );
+        buscarPedidos();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha ao criar pedido: ${resposta.statusCode}'),
+            backgroundColor: const Color(0xFFAE4F48),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro de conexão ao salvar pedido.'),
+          backgroundColor: Color(0xFFAE4F48),
+        ),
+      );
+    }
+  }
+
   // Interação 2: POST /produtos
   Future<void> criarProduto(String nome, double preco) async {
     try {
@@ -258,31 +305,104 @@ class _KanbanScreenState extends State<KanbanScreen> {
   }
 
   void _mostrarModalPedido(BuildContext context) {
+    final descricaoController = TextEditingController();
+    final responsavelController = TextEditingController();
+    final List<int> selecionados = [];
+    int prioridade = 3;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Novo Pedido - Velato'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('SELECIONE OS PRODUTOS:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
-              SizedBox(height: 8),
-              Text('Carregando catálogo do banco...', style: TextStyle(color: Colors.grey, fontSize: 13)),
-              SizedBox(height: 16),
-              TextField(decoration: InputDecoration(labelText: 'Descrição detalhada')),
-              TextField(decoration: InputDecoration(labelText: 'Responsável')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAE4F48), foregroundColor: Colors.white),
-              child: const Text('Salvar')
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Novo Pedido - Velato'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('SELECIONE OS PRODUTOS:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
+                    const SizedBox(height: 8),
+                    if (produtos.isEmpty)
+                      const Text('Nenhum produto no catálogo.', style: TextStyle(color: Colors.grey, fontSize: 13))
+                    else
+                      ...produtos.map((produto) {
+                        final int id = (produto['id'] as num).toInt();
+                        return CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: const Color(0xFF3C5262),
+                          value: selecionados.contains(id),
+                          onChanged: (marcado) {
+                            setStateDialog(() {
+                              if (marcado == true) {
+                                selecionados.add(id);
+                              } else {
+                                selecionados.remove(id);
+                              }
+                            });
+                          },
+                          title: Text(
+                            '${produto['nome']} (R\$ ${produto['preco']})',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descricaoController,
+                      decoration: const InputDecoration(labelText: 'Descrição detalhada'),
+                    ),
+                    TextField(
+                      controller: responsavelController,
+                      decoration: const InputDecoration(labelText: 'Responsável'),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('PRIORIDADE:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
+                    DropdownButton<int>(
+                      value: prioridade,
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('Alta (Urgente)')),
+                        DropdownMenuItem(value: 2, child: Text('Média (Padrão)')),
+                        DropdownMenuItem(value: 3, child: Text('Baixa (Opcional)')),
+                      ],
+                      onChanged: (valor) {
+                        if (valor != null) setStateDialog(() => prioridade = valor);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selecionados.isEmpty) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Selecione pelo menos um produto.'),
+                          backgroundColor: Color(0xFFAE4F48),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
+                    criarPedido(
+                      descricao: descricaoController.text.trim(),
+                      responsavel: responsavelController.text.trim(),
+                      prioridade: prioridade,
+                      produtosIds: List<int>.from(selecionados),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAE4F48), foregroundColor: Colors.white),
+                  child: const Text('Salvar')
+                ),
+              ],
+            );
+          },
         );
       },
     );
