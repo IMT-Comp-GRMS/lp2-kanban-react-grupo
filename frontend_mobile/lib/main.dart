@@ -113,6 +113,40 @@ class _KanbanScreenState extends State<KanbanScreen> {
     }
   }
 
+  // PUT /tarefas/:id (mover pedido de coluna)
+  Future<void> moverPedido(dynamic pedido, String novoStatus) async {
+    try {
+      final resposta = await http.put(
+        Uri.parse('$pedidosUrl/tarefas/${pedido['id']}'),
+        headers: {'Content-Type': 'application/json; charset=utf-8'},
+        body: jsonEncode({
+          'status': novoStatus,
+          'status_anterior': pedido['status'],
+        }),
+      );
+
+      if (!mounted) return;
+      if (resposta.statusCode == 200) {
+        buscarPedidos();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha ao mover pedido: ${resposta.statusCode}'),
+            backgroundColor: const Color(0xFFAE4F48),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro de conexão ao mover pedido.'),
+          backgroundColor: Color(0xFFAE4F48),
+        ),
+      );
+    }
+  }
+
   // POST /tarefas (novo pedido)
   Future<void> criarPedido({
     required String descricao,
@@ -555,7 +589,16 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                       padding: const EdgeInsets.all(12),
                                       itemCount: itensDaColuna.length,
                                       itemBuilder: (context, i) {
-                                        return CardPedidoWidget(pedido: itensDaColuna[i]);
+                                        final pedido = itensDaColuna[i];
+                                        return CardPedidoWidget(
+                                          pedido: pedido,
+                                          onVoltar: index > 0
+                                              ? () => moverPedido(pedido, colunas[index - 1]['titulo'])
+                                              : null,
+                                          onAvancar: index < colunas.length - 1
+                                              ? () => moverPedido(pedido, colunas[index + 1]['titulo'])
+                                              : null,
+                                        );
                                       },
                                     ),
                             ),
@@ -631,8 +674,16 @@ class CardProdutoWidget extends StatelessWidget {
 
 class CardPedidoWidget extends StatelessWidget {
   final dynamic pedido;
+  // null quando o pedido já está na primeira/última coluna
+  final VoidCallback? onVoltar;
+  final VoidCallback? onAvancar;
 
-  const CardPedidoWidget({super.key, required this.pedido});
+  const CardPedidoWidget({
+    super.key,
+    required this.pedido,
+    this.onVoltar,
+    this.onAvancar,
+  });
 
   static const Map<int, Color> coresPrioridade = {
     1: Color(0xFFAE4F48),
@@ -690,6 +741,54 @@ class CardPedidoWidget extends StatelessWidget {
               color: Color(0xFFA79261),
             ),
           ),
+          if (onVoltar != null || onAvancar != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (onVoltar != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onVoltar,
+                      icon: const Icon(Icons.arrow_back, size: 14),
+                      label: const Text('Voltar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF3C5262),
+                        side: const BorderSide(color: Color(0xFF3C5262)),
+                        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        minimumSize: const Size(0, 30),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                  ),
+                if (onVoltar != null && onAvancar != null) const SizedBox(width: 5),
+                if (onAvancar != null)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onAvancar,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3C5262),
+                        foregroundColor: const Color(0xFFF6F0E7),
+                        elevation: 0,
+                        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        minimumSize: const Size(0, 30),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Avançar'),
+                          SizedBox(width: 6),
+                          Icon(Icons.arrow_forward, size: 14),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
