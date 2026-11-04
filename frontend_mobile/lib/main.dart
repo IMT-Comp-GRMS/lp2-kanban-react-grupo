@@ -183,6 +183,63 @@ class _KanbanScreenState extends State<KanbanScreen> {
     );
   }
 
+  void _mostrarDialogo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Configurar Produto'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              TextField(decoration: InputDecoration(labelText: 'Nome do produto')),
+              TextField(decoration: InputDecoration(labelText: 'Preço (ex: 199.90)')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E1172), foregroundColor: Colors.white),
+              child: const Text('Adicionar')
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarModalPedido(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Novo Pedido - Velato'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('SELECIONE OS PRODUTOS:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
+              SizedBox(height: 8),
+              Text('Carregando catálogo do banco...', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              SizedBox(height: 16),
+              TextField(decoration: InputDecoration(labelText: 'Descrição detalhada')),
+              TextField(decoration: InputDecoration(labelText: 'Responsável')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAE4F48), foregroundColor: Colors.white),
+              child: const Text('Salvar')
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -331,62 +388,6 @@ class CardProdutoWidget extends StatelessWidget {
   final dynamic produto;
 
   const CardProdutoWidget({super.key, required this.produto});
-void _mostrarDialogo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Configurar Produto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              TextField(decoration: InputDecoration(labelText: 'Nome do produto')),
-              TextField(decoration: InputDecoration(labelText: 'Preço (ex: 199.90)')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E1172), foregroundColor: Colors.white),
-              child: const Text('Adicionar')
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _mostrarModalPedido(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Novo Pedido - Velato'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('SELECIONE OS PRODUTOS:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
-              SizedBox(height: 8),
-              Text('Carregando catálogo do banco...', style: TextStyle(color: Colors.grey, fontSize: 13)),
-              SizedBox(height: 16),
-              TextField(decoration: InputDecoration(labelText: 'Descrição detalhada')),
-              TextField(decoration: InputDecoration(labelText: 'Responsável')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAE4F48), foregroundColor: Colors.white),
-              child: const Text('Salvar')
-            ),
-          ],
-        );
-      },
-    );
-  }
   @override
   Widget build(BuildContext context) {
     final double preco = (produto['preco'] is num)
