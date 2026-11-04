@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dashboard_screen.dart';
 
 void main() {
   runApp(const VelatoApp());
@@ -445,6 +446,18 @@ class _KanbanScreenState extends State<KanbanScreen> {
           ],
         ),
        actions: [
+    OutlinedButton.icon(
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      ),
+      icon: const Icon(Icons.bar_chart, color: Color(0xFF3C5262), size: 18),
+      label: const Text('Dashboard', style: TextStyle(color: Color(0xFF3C5262))),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Color(0xFF3C5262), width: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+    ),
+    const SizedBox(width: 12),
     TextButton.icon(
       onPressed: () => _mostrarDialogo(context),
       icon: const Icon(Icons.add, color: Colors.white, size: 18),
