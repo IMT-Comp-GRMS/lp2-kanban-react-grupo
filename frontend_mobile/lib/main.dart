@@ -113,6 +113,66 @@ class _KanbanScreenState extends State<KanbanScreen> {
     }
   }
 
+  // DELETE /tarefas/:id (excluir pedido, com confirmação igual ao window.confirm do React)
+  Future<void> excluirPedido(dynamic pedido) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFF6F0E7),
+        title: const Text(
+          'Excluir pedido',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF252623)),
+        ),
+        content: Text('Tem certeza que deseja excluir o pedido "${pedido['titulo']}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFAE4F48),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true) return;
+
+    try {
+      final resposta = await http.delete(Uri.parse('$pedidosUrl/tarefas/${pedido['id']}'));
+
+      if (!mounted) return;
+      if (resposta.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido excluído com sucesso!'),
+            backgroundColor: Color(0xFF3C5262),
+          ),
+        );
+        buscarPedidos();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha ao excluir pedido: ${resposta.statusCode}'),
+            backgroundColor: const Color(0xFFAE4F48),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro de conexão ao excluir pedido.'),
+          backgroundColor: Color(0xFFAE4F48),
+        ),
+      );
+    }
+  }
+
   // PUT /tarefas/:id (mover pedido de coluna)
   Future<void> moverPedido(dynamic pedido, String novoStatus) async {
     try {
@@ -661,6 +721,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                         return CardPedidoWidget(
                                           key: ValueKey(pedido['id']),
                                           pedido: pedido,
+                                          onExcluir: () => excluirPedido(pedido),
                                           onVoltar: index > 0
                                               ? () => moverPedido(pedido, colunas[index - 1]['titulo'])
                                               : null,
@@ -746,12 +807,14 @@ class CardPedidoWidget extends StatefulWidget {
   // null quando o pedido já está na primeira/última coluna
   final VoidCallback? onVoltar;
   final VoidCallback? onAvancar;
+  final VoidCallback? onExcluir;
 
   const CardPedidoWidget({
     super.key,
     required this.pedido,
     this.onVoltar,
     this.onAvancar,
+    this.onExcluir,
   });
 
   static const Map<int, Color> coresPrioridade = {
@@ -824,13 +887,29 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'ID: ${pedido['id']}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF071227),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'ID: ${pedido['id']}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF071227),
+                  ),
+                ),
+              ),
+              // Lixeira no canto superior direito, como no CardPedido.jsx
+              if (widget.onExcluir != null)
+                IconButton(
+                  onPressed: widget.onExcluir,
+                  tooltip: 'Excluir Pedido',
+                  icon: const Icon(Icons.delete_outline, color: Color(0xFFAE4F48), size: 20),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
