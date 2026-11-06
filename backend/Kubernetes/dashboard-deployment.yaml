@@ -30,6 +30,9 @@ spec:
                   key: MYSQL_ROOT_PASSWORD
             - name: DATABASE
               value: BD_DashBoard
+            # Fuso de Brasília para o new Date() do gráfico de volume diário
+            - name: TZ
+              value: America/Sao_Paulo
 ---
 apiVersion: v1
 kind: Service

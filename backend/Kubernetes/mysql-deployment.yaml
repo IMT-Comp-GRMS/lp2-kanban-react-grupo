@@ -23,6 +23,8 @@ spec:
       containers:
         - name: mysql
           image: mysql:8
+          # Fuso de Brasília para NOW(), CURDATE() e TIMESTAMP
+          args: ["--default-time-zone=-03:00"]
           env:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
