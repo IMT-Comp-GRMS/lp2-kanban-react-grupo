@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/pedido_model.dart';
 import '../models/produto_model.dart';
 import '../widgets/coluna_kanban.dart';
+import '../widgets/dialogo_produto.dart';
 import 'dashboard_tela.dart';
 
 class KanbanScreen extends StatefulWidget {
@@ -379,45 +380,12 @@ class _KanbanScreenState extends State<KanbanScreen> {
     }
   }
 
+  // Diálogo "Configurar Produto": o formulário usa o padrão Bloc
+  // (lib/src/blocs e lib/src/widgets/dialogo_produto.dart).
   void _mostrarDialogo(BuildContext context) {
-    final nomeController = TextEditingController();
-    final precoController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Configurar Produto'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomeController,
-                decoration: const InputDecoration(labelText: 'Nome do produto'),
-              ),
-              TextField(
-                controller: precoController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Preço (ex: 199.90)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () {
-                final nome = nomeController.text.trim();
-                final preco = double.tryParse(precoController.text.replaceAll(',', '.')) ?? 0.0;
-                if (nome.isEmpty || preco <= 0) return;
-                Navigator.pop(context);
-                criarProduto(nome, preco);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E1172), foregroundColor: Colors.white),
-              child: const Text('Adicionar')
-            ),
-          ],
-        );
-      },
+      builder: (BuildContext context) => DialogoProduto(onSalvar: criarProduto),
     );
   }
 
