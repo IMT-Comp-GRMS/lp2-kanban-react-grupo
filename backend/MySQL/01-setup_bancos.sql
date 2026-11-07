@@ -1,3 +1,8 @@
+-- O arquivo está em UTF-8. Sem esta linha, o cliente que roda o script na
+-- inicialização lê o texto como latin1 e grava os acentos errados
+-- ("CalÃ§a" em vez de "Calça").
+SET NAMES utf8mb4;
+
 -- ============================================================
 -- BD_Produtos (Configurar_Produto)
 -- ============================================================
@@ -9,6 +14,15 @@ CREATE TABLE IF NOT EXISTS produtos (
     nome VARCHAR(100) NOT NULL,
     preco DECIMAL(10,2) NOT NULL
 );
+
+-- Catálogo inicial. O BD_Produtos é a fonte dos produtos, por isso as calças
+-- precisam existir aqui também, com os mesmos ids das cópias no KanBan e no
+-- BD_DashBoard. Assim o primeiro produto criado pela tela recebe o id 4 e não
+-- sobrescreve a calça de id 1 nas cópias (ON DUPLICATE KEY UPDATE).
+INSERT INTO produtos (id, nome, preco) VALUES
+(1, 'Calça Alfaiataria Zíper Oculto', 259.90),
+(2, 'Calça Cargo Utilitária', 289.00),
+(3, 'Calça Jeans Slim Antifurto', 219.00);
 
 -- ============================================================
 -- KanBan (Criar_Pedido)
@@ -30,10 +44,11 @@ CREATE TABLE IF NOT EXISTS produtos (
     preco DECIMAL(10,2) NOT NULL
 );
 
-INSERT INTO produtos (nome, preco) VALUES
-('Calça Alfaiataria Zíper Oculto', 259.90),
-('Calça Cargo Utilitária', 289.00),
-('Calça Jeans Slim Antifurto', 219.00);
+-- Cópia do catálogo (mesmos ids do BD_Produtos)
+INSERT INTO produtos (id, nome, preco) VALUES
+(1, 'Calça Alfaiataria Zíper Oculto', 259.90),
+(2, 'Calça Cargo Utilitária', 289.00),
+(3, 'Calça Jeans Slim Antifurto', 219.00);
 
 CREATE TABLE IF NOT EXISTS pedidos (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -88,6 +103,13 @@ CREATE TABLE IF NOT EXISTS produtos (
                                           ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 );
+
+-- Cópia do catálogo (mesmos ids do BD_Produtos). Sem ela, totalProdutos ficava
+-- 0 e os itens dos pedidos não entravam (chave estrangeira para produtos).
+INSERT INTO produtos (id, nome, preco) VALUES
+(1, 'Calça Alfaiataria Zíper Oculto', 259.90),
+(2, 'Calça Cargo Utilitária', 289.00),
+(3, 'Calça Jeans Slim Antifurto', 219.00);
 
 CREATE TABLE IF NOT EXISTS pedidos (
     id            INT            NOT NULL,
