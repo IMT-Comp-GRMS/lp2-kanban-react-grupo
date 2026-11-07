@@ -7,7 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:frontend_mobile/main.dart';
+import 'package:frontend_mobile/src/app.dart';
 
 void main() {
   testWidgets('VelatoApp monta e mostra o carregamento inicial',

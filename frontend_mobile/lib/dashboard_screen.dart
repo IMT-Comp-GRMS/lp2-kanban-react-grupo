@@ -3,9 +3,9 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'models/kpis_model.dart';
-import 'models/produto_ranking_model.dart';
-import 'models/volume_diario_model.dart';
+import 'src/models/kpis_model.dart';
+import 'src/models/produto_ranking_model.dart';
+import 'src/models/volume_diario_model.dart';
 
 // Paleta Velato (mesma do frontend-dashboard em React)
 const Color _azul = Color(0xFF3C5262);
