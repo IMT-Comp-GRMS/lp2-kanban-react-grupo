@@ -8,7 +8,12 @@ app.use(express.json())
 // Como na apostila, os eventos ficam em memória: se o Pod do barramento
 // reiniciar, o vetor volta vazio e os eventos antigos se perdem.
 const eventos = []
-let proximoId = 1
+// Na apostila o contador começa em 1. Aqui começa no horário atual em
+// milissegundos (Date.now()) porque o Historico grava o id do evento no MySQL:
+// se o barramento reiniciasse e voltasse a contar do 1, um evento novo teria o
+// mesmo id de um evento antigo já gravado e seria ignorado pelo INSERT IGNORE.
+// Começando por Date.now(), os ids continuam crescendo depois de um reinício.
+let proximoId = Date.now()
 
 app.post('/eventos', (req, res) => {
     const evento = req.body
