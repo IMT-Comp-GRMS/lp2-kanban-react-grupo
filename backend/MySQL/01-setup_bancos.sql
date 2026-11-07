@@ -61,6 +61,9 @@ USE BD_Historico;
 
 CREATE TABLE IF NOT EXISTS historico (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    -- id do evento no barramento; UNIQUE impede gravar a mesma movimentação
+    -- duas vezes quando o Historico reprocessa os eventos (aceita NULL)
+    evento_id INT UNIQUE,
     pedido_id INT NOT NULL,
     status_anterior VARCHAR(50),
     status_novo VARCHAR(50) NOT NULL,

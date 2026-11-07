@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 app.use(cors());
@@ -35,7 +36,8 @@ async function conectar() {
         console.error('⚠️ MySQL ainda indisponível; o pool tentará de novo na próxima requisição:', erro.message);
     }
 }
-conectar();
+// Guarda a Promise para a recuperação de eventos esperar o banco.
+const conectado = conectar();
 
 /**
  * ============================================================================
@@ -47,10 +49,17 @@ conectar();
  */
 const funcoes = {
     // Registra a movimentação do pedido na tabela historico.
-    PedidoMovido: async (dados) => {
+    // Apostila Microsserviços 4.3.51: o eventoId (id do evento no barramento)
+    // vai para a coluna UNIQUE evento_id. Com INSERT IGNORE, um evento que já
+    // foi gravado é ignorado, então reprocessar os eventos não duplica linhas.
+    PedidoMovido: async (dados, eventoId) => {
         try {
-            const sql = 'INSERT INTO historico (pedido_id, status_anterior, status_novo) VALUES (?, ?, ?)';
-            await conexao.query(sql, [dados.pedido_id, dados.status_anterior, dados.status_novo]);
+            const sql = 'INSERT IGNORE INTO historico (evento_id, pedido_id, status_anterior, status_novo) VALUES (?, ?, ?, ?)';
+            const [resultado] = await conexao.query(sql, [eventoId ?? null, dados.pedido_id, dados.status_anterior, dados.status_novo]);
+            if (resultado.affectedRows === 0) {
+                console.log(`↩️ Evento ${eventoId} já registrado; ignorado.`);
+                return;
+            }
             console.log(`✅ Histórico registrado: Pedido #${dados.pedido_id} movido de "${dados.status_anterior}" para "${dados.status_novo}"`);
         } catch (erro) {
             console.error('Erro ao registrar histórico:', erro);
@@ -67,13 +76,13 @@ const funcoes = {
  * correspondente ao tipo do evento.
  */
 app.post('/eventos', async (req, res) => {
-    const { tipo, dados } = req.body;
+    const { tipo, dados, id } = req.body;
 
     // Como na apostila Microsserviços 4.3.47: se o tipo não estiver no mapa,
     // funcoes[tipo] é undefined e a chamada lança erro. O catch vazio ignora
     // de propósito os eventos que não interessam a este serviço.
     try {
-        await funcoes[tipo](dados);
+        await funcoes[tipo](dados, id);
     } catch (err) {}
 
     res.status(200).send({ msg: 'ok' });
@@ -120,6 +129,36 @@ app.get('/historico/:pedido_id', async (req, res) => {
  * INICIALIZAÇÃO DO SERVIDOR
  * ============================================================================
  */
-app.listen(5001, () => {
+/**
+ * ============================================================================
+ * RECUPERAÇÃO DE EVENTOS PERDIDOS
+ * ============================================================================
+ * Apostila Microsserviços 4.3.51: ao subir, o serviço pede ao barramento todos
+ * os eventos guardados e processa cada um. Assim, o que aconteceu enquanto o
+ * Historico estava fora do ar entra no banco. O evento_id UNIQUE garante que
+ * os eventos já gravados não sejam duplicados.
+ */
+async function recuperarEventos() {
+    try {
+        const resposta = await axios.get('http://barramento-service:10000/eventos');
+        console.log(`🔁 Recuperando ${resposta.data.length} evento(s) do barramento...`);
+        for (const evento of resposta.data) {
+            // try/catch individual: um evento com problema (ou de um tipo que
+            // não interessa) não impede o processamento dos próximos.
+            try {
+                await funcoes[evento.tipo](evento.dados, evento.id);
+            } catch (err) {}
+        }
+    } catch (erro) {
+        // No Kubernetes o barramento pode ainda não estar no ar quando o
+        // Historico sobe; nesse caso o serviço segue normalmente.
+        console.error('⚠️ Não foi possível recuperar eventos do barramento:', erro.message);
+    }
+}
+
+app.listen(5001, async () => {
     console.log('Microsserviço de Histórico. Porta 5001.');
+    // Espera a conexão com o banco ficar pronta antes de reprocessar.
+    await conectado;
+    await recuperarEventos();
 });
