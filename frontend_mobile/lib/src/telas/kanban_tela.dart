@@ -23,11 +23,10 @@ class _KanbanScreenState extends State<KanbanScreen> {
   // mais em uma lista com setState nesta tela.
   final pedidosBloc = PedidosBloc();
 
+  // Catálogo usado no diálogo de Novo Pedido. Se o Configurar_Produto estiver
+  // fora do ar, fica vazio e o Kanban continua funcionando com os pedidos.
+  // O carregamento e os erros dos pedidos vêm do stream do PedidosBloc.
   List<ProdutoModel> produtos = [];
-  // carregando/mensagemErro agora valem só para o catálogo de produtos;
-  // o carregamento e os erros dos pedidos vêm do stream do PedidosBloc.
-  bool carregando = true;
-  String? mensagemErro;
 
   // Filtros (iguais ao Kanban web): busca por produto/responsável e prioridade
   final TextEditingController buscaController = TextEditingController();
@@ -45,7 +44,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
   @override
   void initState() {
     super.initState();
-    buscarProdutos();
+    carregarTudo();
   }
 
   @override
@@ -147,40 +146,41 @@ class _KanbanScreenState extends State<KanbanScreen> {
     );
   }
 
-  // Interação 1: GET /produtos
-  Future<void> buscarProdutos() async {
-    setState(() {
-      carregando = true;
-      mensagemErro = null;
-    });
+  // Busca o catálogo e os pedidos AO MESMO TEMPO (Future.wait). Antes, os
+  // pedidos só eram buscados se o catálogo desse certo: com o Configurar_Produto
+  // fora do ar, o Kanban inteiro não abria, mesmo com o Criar_Pedido no ar.
+  // Agora cada microsserviço falha sozinho:
+  // - catálogo falhou: o Kanban mostra os pedidos e só avisa no SnackBar;
+  // - pedidos falharam: o stream do PedidosBloc traz o erro e a tela mostra
+  //   a mensagem com "Tentar novamente".
+  Future<void> carregarTudo() async {
+    final resultados = await Future.wait([
+      buscarProdutos(),
+      pedidosBloc.carregar().then((_) => null),
+    ]);
+    final erroCatalogo = resultados.first;
+    if (erroCatalogo != null) {
+      _avisar('Catálogo de produtos indisponível: $erroCatalogo');
+    }
+  }
 
+  // Interação 1: GET /produtos. Devolve null se deu certo, ou a mensagem de erro.
+  Future<String?> buscarProdutos() async {
     try {
       final resposta = await http.get(Uri.parse('$baseUrl/produtos'));
-      if (resposta.statusCode == 200) {
-        final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
-        setState(() {
-          // cada item do JSON vira um objeto da classe modelo
-          produtos = dados.map((json) => ProdutoModel.fromJSON(json)).toList();
-        });
-      } else {
-        setState(() {
-          mensagemErro = 'Erro ao buscar produtos (${resposta.statusCode})';
-          carregando = false;
-        });
-        return;
+      if (resposta.statusCode != 200) {
+        return 'erro ${resposta.statusCode} no Configurar_Produto.';
       }
-    } catch (e) {
+      final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
+      if (!mounted) return null;
       setState(() {
-        mensagemErro = 'Não foi possível conectar ao backend.';
-        carregando = false;
+        // cada item do JSON vira um objeto da classe modelo
+        produtos = dados.map((json) => ProdutoModel.fromJSON(json)).toList();
       });
-      return;
+      return null;
+    } catch (e) {
+      return 'não foi possível conectar ao Configurar_Produto ($baseUrl).';
     }
-
-    if (!mounted) return;
-    setState(() => carregando = false);
-    // GET /tarefas: o resultado chega pelo stream do PedidosBloc.
-    await pedidosBloc.carregar();
   }
 
   // Mostra no SnackBar a mensagem que o PedidosBloc devolveu (null = deu certo).
@@ -268,6 +268,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
             backgroundColor: Color(0xFF3C5262),
           ),
         );
+        // Atualiza o catálogo para o produto novo aparecer no Novo Pedido
         buscarProdutos();
       } else {
         if (!mounted) return;
@@ -446,21 +447,18 @@ class _KanbanScreenState extends State<KanbanScreen> {
     const SizedBox(width: 40),
   ],
       ),
-      body: carregando
-          ? _carregandoTela()
-          : mensagemErro != null
-              ? _telaDeErro(mensagemErro!)
-              // A lista de pedidos vem do stream do PedidosBloc: toda vez que
-              // o bloc recarrega (depois de criar, mover ou excluir), o
-              // StreamBuilder redesenha as colunas sozinho.
-              : StreamBuilder<List<PedidoModel>>(
-                  stream: pedidosBloc.pedidos,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) return _telaDeErro(snapshot.error.toString());
-                    if (!snapshot.hasData) return _carregandoTela();
-                    return _quadro(snapshot.data!);
-                  },
-                ),
+      // A lista de pedidos vem do stream do PedidosBloc: toda vez que o bloc
+      // recarrega (depois de criar, mover ou excluir), o StreamBuilder
+      // redesenha as colunas sozinho. A tela de erro só aparece quando os
+      // PEDIDOS falham; falha no catálogo vira só um aviso (carregarTudo).
+      body: StreamBuilder<List<PedidoModel>>(
+        stream: pedidosBloc.pedidos,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return _telaDeErro(snapshot.error.toString());
+          if (!snapshot.hasData) return _carregandoTela();
+          return _quadro(snapshot.data!);
+        },
+      ),
     );
   }
 
@@ -479,7 +477,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton(
-            onPressed: buscarProdutos,
+            onPressed: carregarTudo,
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3C5262)),
             child: const Text('Tentar novamente', style: TextStyle(color: Colors.white)),
           ),
