@@ -32,9 +32,9 @@ class KanbanScreen extends StatefulWidget {
 }
 
 class _KanbanScreenState extends State<KanbanScreen> {
-  static const String baseUrl = 'http://localhost:3001';
+  static const String baseUrl = 'http://localhost:30001'; // NodePort do configurar-produto-service
   // Serviço Criar_Pedido (pedidos do kanban)
-  static const String pedidosUrl = 'http://localhost:3000';
+  static const String pedidosUrl = 'http://localhost:30000'; // NodePort do criar-pedido-service
 
   List<dynamic> produtos = [];
   List<dynamic> pedidos = [];
@@ -941,8 +941,8 @@ class CardPedidoWidget extends StatefulWidget {
 }
 
 class _CardPedidoWidgetState extends State<CardPedidoWidget> {
-  // Microsserviço Histórico (kubectl port-forward svc/historico-service 5001:5001)
-  static const String historicoUrl = 'http://localhost:5001';
+  // Microsserviço Histórico (NodePort do historico-service)
+  static const String historicoUrl = 'http://localhost:30005';
 
   List<dynamic> historico = [];
   bool mostrarHistorico = false;

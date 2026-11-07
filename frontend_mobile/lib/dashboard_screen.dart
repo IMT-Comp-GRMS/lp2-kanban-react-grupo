@@ -24,8 +24,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Microsserviço Dashboard (kubectl port-forward svc/dashboard-service 4000:4000)
-  static const String dashboardUrl = 'http://localhost:4000';
+  // Microsserviço Dashboard (NodePort do dashboard-service)
+  static const String dashboardUrl = 'http://localhost:30004';
 
   Map<String, dynamic>? kpis;
   List<dynamic> volumeDiario = [];

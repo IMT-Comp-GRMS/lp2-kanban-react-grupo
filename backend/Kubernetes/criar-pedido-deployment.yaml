@@ -44,3 +44,5 @@ spec:
     - protocol: TCP
       port: 3000
       targetPort: 3000
+      # porta fixa de acesso externo: http://localhost:30000
+      nodePort: 30000

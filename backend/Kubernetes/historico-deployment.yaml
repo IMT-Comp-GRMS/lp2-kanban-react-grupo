@@ -44,3 +44,5 @@ spec:
     - protocol: TCP
       port: 5001
       targetPort: 5001
+      # porta fixa de acesso externo: http://localhost:30005
+      nodePort: 30005
