@@ -6,12 +6,38 @@ type: Opaque
 stringData:
   MYSQL_ROOT_PASSWORD: rafa
 ---
+# Volume persistente do MySQL (apostila Back End com Dart, seção 8.1).
+# Com emptyDir, os dados sumiam sempre que o Pod reiniciava. Com o PVC, os
+# arquivos do banco ficam guardados fora do Pod e sobrevivem a reinícios.
+#
+# Atenção: o script de criação dos bancos (01-setup_bancos.sql, dentro da imagem
+# mysql-velato) só roda quando o volume está VAZIO, ou seja, na primeira vez.
+# Se o SQL mudar, ou para recriar o banco do zero, é preciso apagar o volume:
+#   kubectl delete deployment mysql-deployment
+#   kubectl delete pvc mysql-pvc
+#   kubectl apply -f backend/Kubernetes/mysql-deployment.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Sem storageClassName: usa a StorageClass padrão do Docker Desktop (hostpath)
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql-deployment
 spec:
   replicas: 1
+  # Recreate: derruba o Pod antigo antes de subir o novo. Com o padrão
+  # (RollingUpdate), os dois MySQL abririam os mesmos arquivos ao mesmo tempo.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mysql
@@ -40,7 +66,8 @@ spec:
               mountPath: /var/lib/mysql
       volumes:
         - name: mysql-storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: mysql-pvc
 ---
 apiVersion: v1
 kind: Service
