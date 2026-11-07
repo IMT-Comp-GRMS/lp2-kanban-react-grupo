@@ -33,4 +33,26 @@ mixin Validators {
       }
     },
   );
+
+  // Responsável pelo pedido: pelo menos 2 caracteres, sem contar os espaços.
+  final validarResponsavel = StreamTransformer<String, String>.fromHandlers(
+    handleData: (responsavel, sink) {
+      if (responsavel.trim().length < 2) {
+        sink.addError('Informe o responsável (pelo menos 2 letras).');
+      } else {
+        sink.add(responsavel);
+      }
+    },
+  );
+
+  // Produtos do pedido: a lista de ids marcados não pode estar vazia.
+  final validarProdutos = StreamTransformer<List<int>, List<int>>.fromHandlers(
+    handleData: (ids, sink) {
+      if (ids.isEmpty) {
+        sink.addError('Selecione pelo menos um produto.');
+      } else {
+        sink.add(ids);
+      }
+    },
+  );
 }

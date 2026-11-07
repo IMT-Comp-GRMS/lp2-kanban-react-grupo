@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/pedido_model.dart';
 import '../models/produto_model.dart';
 import '../widgets/coluna_kanban.dart';
+import '../widgets/dialogo_pedido.dart';
 import '../widgets/dialogo_produto.dart';
 import 'dashboard_tela.dart';
 
@@ -389,107 +390,12 @@ class _KanbanScreenState extends State<KanbanScreen> {
     );
   }
 
+  // Diálogo "Novo Pedido": o formulário usa o padrão Bloc
+  // (lib/src/blocs/pedido_form_bloc.dart e lib/src/widgets/dialogo_pedido.dart).
   void _mostrarModalPedido(BuildContext context) {
-    final descricaoController = TextEditingController();
-    final responsavelController = TextEditingController();
-    final List<int> selecionados = [];
-    int prioridade = 3;
-
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: const Text('Novo Pedido - Velato'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('SELECIONE OS PRODUTOS:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
-                    const SizedBox(height: 8),
-                    if (produtos.isEmpty)
-                      const Text('Nenhum produto no catálogo.', style: TextStyle(color: Colors.grey, fontSize: 13))
-                    else
-                      ...produtos.map((produto) {
-                        final int id = produto.id;
-                        return CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          activeColor: const Color(0xFF3C5262),
-                          value: selecionados.contains(id),
-                          onChanged: (marcado) {
-                            setStateDialog(() {
-                              if (marcado == true) {
-                                selecionados.add(id);
-                              } else {
-                                selecionados.remove(id);
-                              }
-                            });
-                          },
-                          title: Text(
-                            '${produto.nome} (R\$ ${produto.preco.toStringAsFixed(2)})',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        );
-                      }),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: descricaoController,
-                      decoration: const InputDecoration(labelText: 'Descrição detalhada'),
-                    ),
-                    TextField(
-                      controller: responsavelController,
-                      decoration: const InputDecoration(labelText: 'Responsável'),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('PRIORIDADE:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF3C5262))),
-                    DropdownButton<int>(
-                      value: prioridade,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('Alta (Urgente)')),
-                        DropdownMenuItem(value: 2, child: Text('Média (Padrão)')),
-                        DropdownMenuItem(value: 3, child: Text('Baixa (Opcional)')),
-                      ],
-                      onChanged: (valor) {
-                        if (valor != null) setStateDialog(() => prioridade = valor);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-                ElevatedButton(
-                  onPressed: () {
-                    if (selecionados.isEmpty) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Selecione pelo menos um produto.'),
-                          backgroundColor: Color(0xFFAE4F48),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.pop(context);
-                    criarPedido(
-                      descricao: descricaoController.text.trim(),
-                      responsavel: responsavelController.text.trim(),
-                      prioridade: prioridade,
-                      produtosIds: List<int>.from(selecionados),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAE4F48), foregroundColor: Colors.white),
-                  child: const Text('Salvar')
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (BuildContext context) => DialogoPedido(produtos: produtos, onSalvar: criarPedido),
     );
   }
 
