@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../blocs/pedidos_bloc.dart';
 import '../models/pedido_model.dart';
 import '../models/produto_model.dart';
 import '../widgets/coluna_kanban.dart';
@@ -17,11 +18,14 @@ class KanbanScreen extends StatefulWidget {
 
 class _KanbanScreenState extends State<KanbanScreen> {
   static const String baseUrl = 'http://localhost:30001'; // NodePort do configurar-produto-service
-  // Serviço Criar_Pedido (pedidos do kanban)
-  static const String pedidosUrl = 'http://localhost:30000'; // NodePort do criar-pedido-service
+
+  // Os pedidos do Kanban ficam no PedidosBloc (serviço Criar_Pedido), e não
+  // mais em uma lista com setState nesta tela.
+  final pedidosBloc = PedidosBloc();
 
   List<ProdutoModel> produtos = [];
-  List<PedidoModel> pedidos = [];
+  // carregando/mensagemErro agora valem só para o catálogo de produtos;
+  // o carregamento e os erros dos pedidos vêm do stream do PedidosBloc.
   bool carregando = true;
   String? mensagemErro;
 
@@ -47,6 +51,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
   @override
   void dispose() {
     buscaController.dispose();
+    pedidosBloc.dispose();
     super.dispose();
   }
 
@@ -172,34 +177,22 @@ class _KanbanScreenState extends State<KanbanScreen> {
       return;
     }
 
-    await buscarPedidos();
+    if (!mounted) return;
+    setState(() => carregando = false);
+    // GET /tarefas: o resultado chega pelo stream do PedidosBloc.
+    await pedidosBloc.carregar();
   }
 
-  // GET /tarefas (pedidos do kanban)
-  Future<void> buscarPedidos() async {
-    try {
-      final resposta = await http.get(Uri.parse('$pedidosUrl/tarefas'));
-      if (!mounted) return;
-      if (resposta.statusCode == 200) {
-        final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
-        setState(() {
-          // cada item do JSON vira um objeto da classe modelo
-          pedidos = dados.map((json) => PedidoModel.fromJSON(json)).toList();
-          carregando = false;
-        });
-      } else {
-        setState(() {
-          mensagemErro = 'Erro ao buscar pedidos (${resposta.statusCode})';
-          carregando = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        mensagemErro = 'Não foi possível conectar ao serviço de pedidos ($pedidosUrl).';
-        carregando = false;
-      });
-    }
+  // Mostra no SnackBar a mensagem que o PedidosBloc devolveu (null = deu certo).
+  void _avisar(String? erro, {String? sucesso}) {
+    if (!mounted) return;
+    if (erro == null && sucesso == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(erro ?? sucesso!),
+        backgroundColor: erro == null ? const Color(0xFF3C5262) : const Color(0xFFAE4F48),
+      ),
+    );
   }
 
   // DELETE /tarefas/:id (excluir pedido, com confirmação igual ao window.confirm do React)
@@ -231,116 +224,31 @@ class _KanbanScreenState extends State<KanbanScreen> {
     );
     if (confirmou != true) return;
 
-    try {
-      final resposta = await http.delete(Uri.parse('$pedidosUrl/tarefas/${pedido.id}'));
-
-      if (!mounted) return;
-      if (resposta.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido excluído com sucesso!'),
-            backgroundColor: Color(0xFF3C5262),
-          ),
-        );
-        buscarPedidos();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Falha ao excluir pedido: ${resposta.statusCode}'),
-            backgroundColor: const Color(0xFFAE4F48),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro de conexão ao excluir pedido.'),
-          backgroundColor: Color(0xFFAE4F48),
-        ),
-      );
-    }
+    // DELETE /tarefas/:id feito pelo PedidosBloc, que recarrega a lista
+    final erro = await pedidosBloc.excluir(pedido);
+    _avisar(erro, sucesso: 'Pedido excluído com sucesso!');
   }
 
-  // PUT /tarefas/:id (mover pedido de coluna)
+  // PUT /tarefas/:id (mover pedido de coluna), pelo PedidosBloc
   Future<void> moverPedido(PedidoModel pedido, String novoStatus) async {
-    try {
-      final resposta = await http.put(
-        Uri.parse('$pedidosUrl/tarefas/${pedido.id}'),
-        headers: {'Content-Type': 'application/json; charset=utf-8'},
-        body: jsonEncode({
-          'status': novoStatus,
-          'status_anterior': pedido.status,
-        }),
-      );
-
-      if (!mounted) return;
-      if (resposta.statusCode == 200) {
-        buscarPedidos();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Falha ao mover pedido: ${resposta.statusCode}'),
-            backgroundColor: const Color(0xFFAE4F48),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro de conexão ao mover pedido.'),
-          backgroundColor: Color(0xFFAE4F48),
-        ),
-      );
-    }
+    final erro = await pedidosBloc.mover(pedido, novoStatus);
+    _avisar(erro);
   }
 
-  // POST /tarefas (novo pedido)
+  // POST /tarefas (novo pedido), pelo PedidosBloc
   Future<void> criarPedido({
     required String descricao,
     required String responsavel,
     required int prioridade,
     required List<int> produtosIds,
   }) async {
-    try {
-      final resposta = await http.post(
-        Uri.parse('$pedidosUrl/tarefas'),
-        headers: {'Content-Type': 'application/json; charset=utf-8'},
-        body: jsonEncode({
-          'descricao': descricao,
-          'responsavel': responsavel,
-          'prioridade': prioridade,
-          'produtosIds': produtosIds,
-        }),
-      );
-
-      if (!mounted) return;
-      if (resposta.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido criado com sucesso!'),
-            backgroundColor: Color(0xFF3C5262),
-          ),
-        );
-        buscarPedidos();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Falha ao criar pedido: ${resposta.statusCode}'),
-            backgroundColor: const Color(0xFFAE4F48),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro de conexão ao salvar pedido.'),
-          backgroundColor: Color(0xFFAE4F48),
-        ),
-      );
-    }
+    final erro = await pedidosBloc.criar(
+      descricao: descricao,
+      responsavel: responsavel,
+      prioridade: prioridade,
+      produtosIds: produtosIds,
+    );
+    _avisar(erro, sucesso: 'Pedido criado com sucesso!');
   }
 
   // Interação 2: POST /produtos
@@ -539,66 +447,90 @@ class _KanbanScreenState extends State<KanbanScreen> {
   ],
       ),
       body: carregando
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF3C5262)))
+          ? _carregandoTela()
           : mensagemErro != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        mensagemErro!,
-                        style: const TextStyle(color: Color(0xFFAE4F48), fontSize: 16),
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: buscarProdutos,
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3C5262)),
-                        child: const Text('Tentar novamente', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.only(top: 20.0, bottom: 20.0, left: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  _barraDeFiltros(),
-                  Expanded(
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: colunas.length,
-                    itemBuilder: (context, index) {
-                      final coluna = colunas[index];
-                      final itensDaColuna = pedidos
-                          .where((p) => p.status == coluna['titulo'])
-                          .where(passaNosFiltros)
-                          .toList()
-                        ..sort((a, b) => a.prioridade.compareTo(b.prioridade));
-
-                      return ColunaKanban(
-                        titulo: coluna['titulo'].toString(),
-                        cor: coluna['cor'] as Color,
-                        pedidos: itensDaColuna,
-                        mensagemVazia: filtrosAtivos
-                            ? 'Nenhum pedido encontrado'
-                            : index == 0
-                                ? 'Nenhum pedido cadastrado'
-                                : 'Sem itens nesta etapa',
-                        onExcluir: excluirPedido,
-                        onVoltar: index > 0
-                            ? (pedido) => moverPedido(pedido, colunas[index - 1]['titulo'])
-                            : null,
-                        onAvancar: index < colunas.length - 1
-                            ? (pedido) => moverPedido(pedido, colunas[index + 1]['titulo'])
-                            : null,
-                      );
-                    },
-                  ),
-                  ),
-                    ],
-                  ),
+              ? _telaDeErro(mensagemErro!)
+              // A lista de pedidos vem do stream do PedidosBloc: toda vez que
+              // o bloc recarrega (depois de criar, mover ou excluir), o
+              // StreamBuilder redesenha as colunas sozinho.
+              : StreamBuilder<List<PedidoModel>>(
+                  stream: pedidosBloc.pedidos,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) return _telaDeErro(snapshot.error.toString());
+                    if (!snapshot.hasData) return _carregandoTela();
+                    return _quadro(snapshot.data!);
+                  },
                 ),
+    );
+  }
+
+  Widget _carregandoTela() {
+    return const Center(child: CircularProgressIndicator(color: Color(0xFF3C5262)));
+  }
+
+  Widget _telaDeErro(String mensagem) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            mensagem,
+            style: const TextStyle(color: Color(0xFFAE4F48), fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: buscarProdutos,
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3C5262)),
+            child: const Text('Tentar novamente', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Barra de filtros + as 5 colunas. Os filtros continuam com setState: mudar o
+  // filtro redesenha a tela, e o StreamBuilder entrega de novo a última lista.
+  Widget _quadro(List<PedidoModel> pedidos) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20.0, bottom: 20.0, left: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _barraDeFiltros(),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: colunas.length,
+              itemBuilder: (context, index) {
+                final coluna = colunas[index];
+                final itensDaColuna = pedidos
+                    .where((p) => p.status == coluna['titulo'])
+                    .where(passaNosFiltros)
+                    .toList()
+                  ..sort((a, b) => a.prioridade.compareTo(b.prioridade));
+
+                return ColunaKanban(
+                  titulo: coluna['titulo'].toString(),
+                  cor: coluna['cor'] as Color,
+                  pedidos: itensDaColuna,
+                  mensagemVazia: filtrosAtivos
+                      ? 'Nenhum pedido encontrado'
+                      : index == 0
+                          ? 'Nenhum pedido cadastrado'
+                          : 'Sem itens nesta etapa',
+                  onExcluir: excluirPedido,
+                  onVoltar: index > 0
+                      ? (pedido) => moverPedido(pedido, colunas[index - 1]['titulo'])
+                      : null,
+                  onAvancar: index < colunas.length - 1
+                      ? (pedido) => moverPedido(pedido, colunas[index + 1]['titulo'])
+                      : null,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
