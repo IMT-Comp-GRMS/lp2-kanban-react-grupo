@@ -11,8 +11,8 @@ dependencies:
   shelf_router: ^1.1.2
   http: ^1.1.0
   mysql_dart: ^3.0.3
+  dotenv: ^4.2.0
 
 dev_dependencies:
-  http: ^1.2.2
   lints: ^6.0.0
   test: ^1.25.6

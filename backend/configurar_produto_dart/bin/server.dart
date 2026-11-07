@@ -1,114 +1,44 @@
-import 'dart:convert';
 import 'dart:io';
-import 'package:shelf/shelf.dart';
+
+import 'package:configurar_produto_dart/src/api.dart';
+import 'package:configurar_produto_dart/src/config/app_config.dart';
+import 'package:configurar_produto_dart/src/config/database.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_router/shelf_router.dart';
-import 'package:mysql_dart/mysql_dart.dart';
-import 'package:http/http.dart' as http;
 
-// CONEXÃO COM O BANCO DE DADOS usando mysql_dart
-MySQLConnectionPool conectar() {
-  return MySQLConnectionPool(
-    host: Platform.environment['HOST'] ?? '127.0.0.1',
-    port: int.tryParse(Platform.environment['PORT'] ?? '3306') ?? 3306,
-    userName: Platform.environment['USERBD'] ?? 'root',
-    password: Platform.environment['PASSWORD'] ?? '',
-    databaseName: Platform.environment['DATABASE'] ?? 'BD_Produtos',
-    maxConnections: 10,
-    secure: false, // Fundamental para MySQL 8
-    allowPublicKeyRetrieval: true, // Fundamental para MySQL 8
+/// Ponto de entrada: lê a configuração, espera o banco e sobe o servidor.
+Future<void> main() async {
+  final config = AppConfig.fromEnv();
+  stdout.writeln('Iniciando com $config');
+
+  final pool = criarPool(config);
+
+  // O MySQL pode demorar dezenas de segundos na primeira subida,
+  // enquanto executa os scripts de criação dos bancos.
+  stdout.writeln('Aguardando o banco de dados...');
+  await aguardarBanco(pool);
+  stdout.writeln('Banco disponivel.');
+
+  final servidor = await shelf_io.serve(
+    construirApi(config, pool),
+    InternetAddress.anyIPv4,
+    config.serverPort,
   );
-}
 
-void main() async {
-  final pool = conectar();
-  final router = Router();
+  stdout.writeln('✅ Configurar_Produto em Dart ouvindo na porta ${servidor.port}');
 
-  // GET /produtos
-  router.get('/produtos', (Request req) async {
-    try {
-      final resultados = await pool.execute('SELECT * FROM produtos');
-      
-      final produtos = resultados.rows.map((row) {
-        final dados = row.assoc().cast<String, String?>();
-        return {
-          'id': int.tryParse(dados['id']!) ?? 0,
-          'nome': dados['nome'],
-          'preco': double.tryParse(dados['preco']!) ?? 0.0,
-        };
-      }).toList();
-      
-      return Response.ok(
-        jsonEncode(produtos), 
-        headers: {'content-type': 'application/json; charset=utf-8'}
-      );
-    } catch (erro) {
-      print('Erro ao buscar produtos: $erro');
-      return Response.internalServerError(body: jsonEncode({'mensagem': 'Erro interno.'}));
-    }
-  });
+  // Desligamento gracioso: ao receber SIGTERM (enviado pelo Kubernetes antes
+  // de remover um pod) ou SIGINT (Ctrl+C), o servidor para de aceitar novas
+  // conexões, conclui as que estão em andamento e só então fecha o pool.
+  Future<void> desligar(ProcessSignal sinal) async {
+    stdout.writeln('Recebido $sinal, encerrando...');
+    await servidor.close();
+    await pool.close();
+    exit(0);
+  }
 
-  // POST /produtos
-  router.post('/produtos', (Request req) async {
-    final payload = await req.readAsString();
-    final body = jsonDecode(payload);
-    final nome = body['nome'];
-    final preco = body['preco'];
-
-    if (nome == null || preco == null) {
-      return Response(400, body: jsonEncode({'mensagem': 'Nome e preço são obrigatórios.'}));
-    }
-
-    try {
-      final sql = 'INSERT INTO produtos (nome, preco) VALUES (:nome, :preco)';
-      final resultado = await pool.execute(sql, {'nome': nome, 'preco': preco});
-
-      final produtoCriado = {
-        'id': resultado.lastInsertID.toInt(),
-        'nome': nome,
-        'preco': preco
-      };
-
-      try {
-        await http.post(
-          Uri.parse('http://barramento-service:10000/eventos'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'tipo': 'ProdutoCriado', 'dados': produtoCriado}),
-        );
-      } catch (err) {
-        print('Barramento fora do ar: $err');
-      }
-
-      return Response(201, 
-        body: jsonEncode(produtoCriado), 
-        headers: {'content-type': 'application/json; charset=utf-8'}
-      );
-    } catch (erro) {
-      print('Erro ao inserir produto: $erro');
-      return Response.internalServerError(body: jsonEncode({'mensagem': 'Erro interno.'}));
-    }
-  });
-
-  final handler = const Pipeline()
-      .addMiddleware(liberarCors())
-      .addHandler(router.call);
-
-  final servidor = await shelf_io.serve(handler, InternetAddress.anyIPv4, 3001);
-  print('✅ Configurar_Produto em Dart rodando na porta ${servidor.port}');
-}
-
-// Middleware de CORS
-Middleware liberarCors({String origem = '*'}) {
-  final cabecalhos = {
-    'access-control-allow-origin': origem,
-    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'access-control-allow-headers': 'Content-Type, Authorization',
-    'access-control-max-age': '86400',
-  };
-  return (Handler proximo) {
-    return (Request requisicao) async {
-      if (requisicao.method == 'OPTIONS') return Response(204, headers: cabecalhos);
-      return (await proximo(requisicao)).change(headers: cabecalhos);
-    };
-  };
+  ProcessSignal.sigint.watch().listen(desligar);
+  // SIGTERM não existe no Windows; observá-lo lá lançaria exceção.
+  if (!Platform.isWindows) {
+    ProcessSignal.sigterm.watch().listen(desligar);
+  }
 }

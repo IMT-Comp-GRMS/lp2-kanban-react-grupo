@@ -15,20 +15,23 @@ spec:
       containers:
         - name: configurar-produto
           image: configurar-produto-dart:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 3001
+          # Nomes de variável lidos pelo AppConfig (lib/src/config/app_config.dart)
           env:
-            - name: HOST
+            - name: APP_ENV
+              value: production
+            - name: DB_HOST
               value: mysql-service
-            - name: USERBD
+            - name: DB_USER
               value: root
-            - name: PASSWORD
+            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
                   key: MYSQL_ROOT_PASSWORD
-            - name: DATABASE
+            - name: DB_NAME
               value: BD_Produtos
 ---
 apiVersion: v1
