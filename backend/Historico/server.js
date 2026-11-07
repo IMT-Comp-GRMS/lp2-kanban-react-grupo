@@ -39,16 +39,15 @@ conectar();
 
 /**
  * ============================================================================
- * ROTA: OUVIR EVENTOS DO BARRAMENTO
- * Rota: POST /eventos
+ * MAPA DE FUNÇÕES POR TIPO DE EVENTO
  * ============================================================================
- * Recebe eventos do barramento. Quando o tipo for 'PedidoMovido',
- * registra a movimentação na tabela historico.
+ * Padrão da apostila Microsserviços 4.3.47: cada tipo de evento que interessa
+ * a este serviço é uma chave do objeto `funcoes`, e o valor é a função que o
+ * trata. Para tratar um evento novo, basta acrescentar uma chave.
  */
-app.post('/eventos', async (req, res) => {
-    const { tipo, dados } = req.body;
-
-    if (tipo === 'PedidoMovido') {
+const funcoes = {
+    // Registra a movimentação do pedido na tabela historico.
+    PedidoMovido: async (dados) => {
         try {
             const sql = 'INSERT INTO historico (pedido_id, status_anterior, status_novo) VALUES (?, ?, ?)';
             await conexao.query(sql, [dados.pedido_id, dados.status_anterior, dados.status_novo]);
@@ -57,6 +56,25 @@ app.post('/eventos', async (req, res) => {
             console.error('Erro ao registrar histórico:', erro);
         }
     }
+};
+
+/**
+ * ============================================================================
+ * ROTA: OUVIR EVENTOS DO BARRAMENTO
+ * Rota: POST /eventos
+ * ============================================================================
+ * Recebe eventos do barramento e chama a função do mapa `funcoes`
+ * correspondente ao tipo do evento.
+ */
+app.post('/eventos', async (req, res) => {
+    const { tipo, dados } = req.body;
+
+    // Como na apostila Microsserviços 4.3.47: se o tipo não estiver no mapa,
+    // funcoes[tipo] é undefined e a chamada lança erro. O catch vazio ignora
+    // de propósito os eventos que não interessam a este serviço.
+    try {
+        await funcoes[tipo](dados);
+    } catch (err) {}
 
     res.status(200).send({ msg: 'ok' });
 });
