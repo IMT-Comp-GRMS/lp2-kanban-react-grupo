@@ -23,3 +23,8 @@ class ErroValidacao extends ErroApp {
 class RequisicaoInvalida extends ErroApp {
   const RequisicaoInvalida(super.mensagem);
 }
+
+/// O recurso pedido não existe (ex.: produto com id inexistente). Vira 404.
+class NaoEncontrado extends ErroApp {
+  const NaoEncontrado(super.mensagem);
+}

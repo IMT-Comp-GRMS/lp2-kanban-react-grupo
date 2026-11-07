@@ -25,22 +25,35 @@ class ProdutoController {
       return _json(200, produtos.map((p) => p.toJson()).toList());
     });
 
-    // POST /produtos -> 201 com o produto criado
+    // GET /produtos/<id> -> 200 com o produto, 404 se não existir.
+    // É o recurso para onde aponta o cabeçalho Location do POST.
+    router.get('/<id>', (Request _, String id) async {
+      final numero = int.tryParse(id);
+      if (numero == null) {
+        throw RequisicaoInvalida('O id do produto deve ser um numero inteiro.');
+      }
+      final produto = await _service.buscarPorId(numero);
+      return _json(200, produto.toJson());
+    });
+
+    // POST /produtos -> 201 com o produto criado e o cabeçalho Location
+    // apontando para ele, como no _criar da seção 11.5 da apostila Back End
+    // com Dart (nível 2 do modelo de maturidade de Richardson).
     router.post('/', (Request requisicao) async {
       final corpo = await _lerJson(requisicao);
       final criado = await _service.criar(_montarProduto(corpo));
-      return _json(201, criado.toJson());
+      return _json(201, criado.toJson(), headers: {'location': '/produtos/${criado.id}'});
     });
 
     return router;
   }
 
   /// Serializa o corpo como JSON com o cabeçalho correto.
-  Response _json(int status, Object corpo) {
+  Response _json(int status, Object corpo, {Map<String, String> headers = const {}}) {
     return Response(
       status,
       body: jsonEncode(corpo),
-      headers: {'content-type': 'application/json; charset=utf-8'},
+      headers: {'content-type': 'application/json; charset=utf-8', ...headers},
     );
   }
 

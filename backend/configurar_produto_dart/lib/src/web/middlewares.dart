@@ -89,5 +89,11 @@ Response _traduzir(ErroApp erro) {
         titulo: 'Requisicao malformada',
         detalhe: erro.mensagem,
       ),
+    NaoEncontrado() => problema(
+        status: 404,
+        tipo: 'nao-encontrado',
+        titulo: 'Recurso nao encontrado',
+        detalhe: erro.mensagem,
+      ),
   };
 }

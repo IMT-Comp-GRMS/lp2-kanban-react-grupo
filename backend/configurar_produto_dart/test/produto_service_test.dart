@@ -23,6 +23,14 @@ class RepositorioFake implements ProdutoRepository {
 
   @override
   Future<List<Produto>> listar() async => List.of(_dados);
+
+  @override
+  Future<Produto?> buscarPorId(int id) async {
+    for (final p in _dados) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
 }
 
 /// Publicador falso: em vez de enviar ao barramento, guarda os eventos.
@@ -86,5 +94,15 @@ void main() {
     await service.criar(valido(nome: 'Calça B'));
     final lista = await service.listar();
     expect(lista.map((p) => p.nome), ['Calça A', 'Calça B']);
+  });
+
+  test('busca um produto existente pelo id', () async {
+    final criado = await service.criar(valido(nome: 'Calça A'));
+    final achado = await service.buscarPorId(criado.id!);
+    expect(achado.nome, 'Calça A');
+  });
+
+  test('buscarPorId lança NaoEncontrado para id inexistente', () {
+    expect(() => service.buscarPorId(999), throwsA(isA<NaoEncontrado>()));
   });
 }

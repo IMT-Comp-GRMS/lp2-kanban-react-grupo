@@ -15,6 +15,16 @@ class ProdutoService {
 
   Future<List<Produto>> listar() => _repository.listar();
 
+  /// Busca um produto pelo id. Se não existir, lança NaoEncontrado, que o
+  /// middleware de erros transforma em 404.
+  Future<Produto> buscarPorId(int id) async {
+    final produto = await _repository.buscarPorId(id);
+    if (produto == null) {
+      throw NaoEncontrado('Nao existe produto com id $id.');
+    }
+    return produto;
+  }
+
   /// Valida todos os campos de uma vez e devolve o conjunto completo de
   /// problemas, para o usuário corrigir tudo em uma só rodada.
   void _validar(Produto p) {

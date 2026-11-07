@@ -33,6 +33,16 @@ class MySqlProdutoRepository implements ProdutoRepository {
   }
 
   @override
+  Future<Produto?> buscarPorId(int id) async {
+    final resultado = await _pool.execute(
+      'SELECT $_colunas FROM produtos WHERE id = :id',
+      {'id': id},
+    );
+    if (resultado.rows.isEmpty) return null;
+    return _mapear(resultado.rows.first);
+  }
+
+  @override
   Future<Produto> inserir(Produto produto) async {
     // Parâmetros nomeados: o valor nunca é concatenado no texto do comando,
     // o que elimina a possibilidade de injeção de SQL.

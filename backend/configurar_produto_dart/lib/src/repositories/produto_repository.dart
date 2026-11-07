@@ -8,4 +8,7 @@ import '../models/produto.dart';
 abstract interface class ProdutoRepository {
   Future<List<Produto>> listar();
   Future<Produto> inserir(Produto produto);
+
+  /// Devolve o produto com esse id, ou null se não existir.
+  Future<Produto?> buscarPorId(int id);
 }
