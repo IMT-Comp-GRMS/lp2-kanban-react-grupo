@@ -19,7 +19,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Variável global para manter a conexão viva com o banco de dados
+// Pool de conexões com o banco de dados (criado em conectar())
 let conexao;
 
 /**
@@ -31,16 +31,22 @@ let conexao;
  * via ConfigMap/Secret (em produção/cluster).
  */
 async function conectar() {
+    // Pool de conexões (mesmo conceito do MySQLConnectionPool do serviço Dart):
+    // em vez de UMA conexão aberta só na partida, o pool abre conexões quando
+    // precisa e as reaproveita. Se o MySQL ainda não estiver pronto (ou reiniciar),
+    // a próxima consulta abre uma conexão nova e o serviço se recupera sozinho.
+    conexao = mysql.createPool({
+        host: process.env.HOST,
+        user: process.env.USERBD,
+        password: process.env.PASSWORD,
+        database: process.env.DATABASE,
+        connectionLimit: 10
+    });
     try {
-        conexao = await mysql.createConnection({
-            host: process.env.HOST,
-            user: process.env.USERBD,
-            password: process.env.PASSWORD,
-            database: process.env.DATABASE
-        });
+        await conexao.query('SELECT 1');
         console.log('✅ Conectado ao MySQL com sucesso!');
     } catch (erro) {
-        console.error('❌ Erro fatal ao conectar ao MySQL:', erro);
+        console.error('⚠️ MySQL ainda indisponível; o pool tentará de novo na próxima requisição:', erro.message);
     }
 }
 conectar();

@@ -16,17 +16,23 @@ let conexao;
  * Estabelece a conexão com o MySQL usando as credenciais do arquivo .env.
  */
 async function conectar() {
+    // Pool de conexões (mesmo conceito do MySQLConnectionPool do serviço Dart):
+    // em vez de UMA conexão aberta só na partida, o pool abre conexões quando
+    // precisa e as reaproveita. Se o MySQL ainda não estiver pronto (ou reiniciar),
+    // a próxima consulta abre uma conexão nova e o serviço se recupera sozinho.
+    conexao = mysql.createPool({
+        host: process.env.HOST,
+        user: process.env.USERBD,
+        password: process.env.PASSWORD,
+        database: process.env.DATABASE,
+        charset: 'utf8mb4',
+        connectionLimit: 10
+    });
     try {
-        conexao = await mysql.createConnection({
-            host: process.env.HOST,
-            user: process.env.USERBD,
-            password: process.env.PASSWORD,
-            database: process.env.DATABASE,
-            charset: 'utf8mb4'
-        });
+        await conexao.query('SELECT 1');
         console.log('✅ Conectado ao BD_Historico com sucesso!');
     } catch (erro) {
-        console.error('❌ Erro fatal ao conectar ao MySQL:', erro);
+        console.error('⚠️ MySQL ainda indisponível; o pool tentará de novo na próxima requisição:', erro.message);
     }
 }
 conectar();
