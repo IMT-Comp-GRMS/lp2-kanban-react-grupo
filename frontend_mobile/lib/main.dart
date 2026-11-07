@@ -41,6 +41,11 @@ class _KanbanScreenState extends State<KanbanScreen> {
   bool carregando = true;
   String? mensagemErro;
 
+  // Filtros (iguais ao Kanban web): busca por produto/responsável e prioridade
+  final TextEditingController buscaController = TextEditingController();
+  String termoBusca = '';
+  int? filtroPrioridade; // null = todas as prioridades
+
   final List < Map < String , dynamic > > colunas = [
    {'titulo': 'Pedidos', 'cor': const Color(0xFF3C5262)},
     {'titulo': 'Pagamento Confirmado', 'cor': const Color(0xFFA79261)},
@@ -53,6 +58,103 @@ class _KanbanScreenState extends State<KanbanScreen> {
   void initState() {
     super.initState();
     buscarProdutos();
+  }
+
+  @override
+  void dispose() {
+    buscaController.dispose();
+    super.dispose();
+  }
+
+  bool get filtrosAtivos => termoBusca.isNotEmpty || filtroPrioridade != null;
+
+  void limparFiltros() {
+    buscaController.clear();
+    setState(() {
+      termoBusca = '';
+      filtroPrioridade = null;
+    });
+  }
+
+  // Mesmo critério do App.jsx: o termo aparece no título (produtos) ou no responsável
+  bool passaNosFiltros(dynamic pedido) {
+    if (termoBusca.isNotEmpty) {
+      final termo = termoBusca.toLowerCase();
+      final titulo = (pedido['titulo'] ?? '').toString().toLowerCase();
+      final responsavel = (pedido['responsavel'] ?? '').toString().toLowerCase();
+      if (!titulo.contains(termo) && !responsavel.contains(termo)) return false;
+    }
+    if (filtroPrioridade != null && pedido['prioridade'] != filtroPrioridade) return false;
+    return true;
+  }
+
+  Widget _barraDeFiltros() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16, bottom: 16),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text(
+            'Filtrar Pedidos:',
+            style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3C5262), fontSize: 14),
+          ),
+          SizedBox(
+            width: 300,
+            child: TextField(
+              controller: buscaController,
+              onChanged: (texto) => setState(() => termoBusca = texto.trim()),
+              decoration: InputDecoration(
+                hintText: 'Buscar por produto ou responsável...',
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.search, size: 18),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.grey.shade500),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int?>(
+                value: filtroPrioridade,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF252623)),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Todas as Prioridades')),
+                  DropdownMenuItem(value: 1, child: Text('Alta (Urgente)')),
+                  DropdownMenuItem(value: 2, child: Text('Média (Padrão)')),
+                  DropdownMenuItem(value: 3, child: Text('Baixa')),
+                ],
+                onChanged: (valor) => setState(() => filtroPrioridade = valor),
+              ),
+            ),
+          ),
+          if (filtrosAtivos)
+            TextButton(
+              onPressed: limparFiltros,
+              child: const Text(
+                'Limpar Filtros',
+                style: TextStyle(
+                  color: Color(0xFFAE4F48),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Color(0xFFAE4F48),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   // Interação 1: GET /produtos
@@ -596,7 +698,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
               ),
               const Flexible(
                 child: Text(
-                  'Configurar Produto',
+                  'Orders',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Color(0xFFA79261),
@@ -664,6 +766,11 @@ class _KanbanScreenState extends State<KanbanScreen> {
                 )
               : Padding(
                   padding: const EdgeInsets.only(top: 20.0, bottom: 20.0, left: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  _barraDeFiltros(),
+                  Expanded(
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: colunas.length,
@@ -671,6 +778,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                       final coluna = colunas[index];
                       final itensDaColuna = pedidos
                           .where((p) => p['status'] == coluna['titulo'])
+                          .where(passaNosFiltros)
                           .toList()
                         ..sort((a, b) => ((a['prioridade'] ?? 3) as num)
                             .compareTo((b['prioridade'] ?? 3) as num));
@@ -707,9 +815,11 @@ class _KanbanScreenState extends State<KanbanScreen> {
                               child: itensDaColuna.isEmpty
                                   ? Center(
                                       child: Text(
-                                        index == 0
-                                            ? 'Nenhum pedido cadastrado'
-                                            : 'Sem itens nesta etapa',
+                                        filtrosAtivos
+                                            ? 'Nenhum pedido encontrado'
+                                            : index == 0
+                                                ? 'Nenhum pedido cadastrado'
+                                                : 'Sem itens nesta etapa',
                                         style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                                       ),
                                     )
@@ -736,6 +846,9 @@ class _KanbanScreenState extends State<KanbanScreen> {
                         ),
                       );
                     },
+                  ),
+                  ),
+                    ],
                   ),
                 ),
     );
