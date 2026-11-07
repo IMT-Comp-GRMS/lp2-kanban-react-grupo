@@ -4,10 +4,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { salvarPedidosNoCofre } from './store/pedidosSlice';
 
 /* ==========================================================================
-   URLS DA API — Kubernetes (NodePort)
+   URLS DA API — Kubernetes (via kubectl port-forward)
    ========================================================================== */
-const URL_CRIAR_PEDIDO = 'http://localhost:30991';       // era :3000
-const URL_CONFIGURAR_PRODUTO = 'http://localhost:32358';  // era :3001
+const URL_CRIAR_PEDIDO = 'http://localhost:3000';       // kubectl port-forward svc/criar-pedido-service 3000:3000
+const URL_CONFIGURAR_PRODUTO = 'http://localhost:3001';  // kubectl port-forward svc/configurar-produto-service 3001:3001
 
 const App = () => {
   const dispatch = useDispatch();
