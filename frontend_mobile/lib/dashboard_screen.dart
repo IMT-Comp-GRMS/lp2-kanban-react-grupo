@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'models/kpis_model.dart';
+import 'models/produto_ranking_model.dart';
+import 'models/volume_diario_model.dart';
 
 // Paleta Velato (mesma do frontend-dashboard em React)
 const Color _azul = Color(0xFF3C5262);
@@ -27,9 +30,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Microsserviço Dashboard (NodePort do dashboard-service)
   static const String dashboardUrl = 'http://localhost:30004';
 
-  Map<String, dynamic>? kpis;
-  List<dynamic> volumeDiario = [];
-  List<dynamic> produtosMaisPedidos = [];
+  KpisModel? kpis;
+  List<VolumeDiarioModel> volumeDiario = [];
+  List<ProdutoRankingModel> produtosMaisPedidos = [];
   bool carregando = true;
   String? mensagemErro;
 
@@ -62,9 +65,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        kpis = resultados[0] as Map<String, dynamic>;
-        volumeDiario = resultados[1] as List<dynamic>;
-        produtosMaisPedidos = resultados[2] as List<dynamic>;
+        // cada JSON vira objeto(s) da classe modelo correspondente
+        kpis = KpisModel.fromJSON(resultados[0]);
+        volumeDiario = (resultados[1] as List<dynamic>)
+            .map((json) => VolumeDiarioModel.fromJSON(json))
+            .toList();
+        produtosMaisPedidos = (resultados[2] as List<dynamic>)
+            .map((json) => ProdutoRankingModel.fromJSON(json))
+            .toList();
         carregando = false;
       });
     } catch (e) {
@@ -189,10 +197,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _conteudo() {
     final cards = [
       // Ícones no lugar dos emojis do React (📦 ✅ 🔴 🛍️), que nem sempre carregam no Flutter Web
-      _KpiCard(icone: Icons.inventory_2, corIcone: const Color(0xFFC68A4E), titulo: 'Total de Pedidos', valor: kpis?['totalPedidos'] ?? 0, cor: _azul),
-      _KpiCard(icone: Icons.check_box, corIcone: const Color(0xFF43A047), titulo: 'Entregues Hoje', valor: kpis?['entreguesHoje'] ?? 0, cor: _dourado),
-      _KpiCard(icone: Icons.circle, corIcone: const Color(0xFFE53935), titulo: 'Urgentes em Aberto', valor: kpis?['urgentesAberto'] ?? 0, cor: _vermelho),
-      _KpiCard(icone: Icons.shopping_bag, corIcone: const Color(0xFFD81B60), titulo: 'Produtos no Catálogo', valor: kpis?['totalProdutos'] ?? 0, cor: _roxo),
+      _KpiCard(icone: Icons.inventory_2, corIcone: const Color(0xFFC68A4E), titulo: 'Total de Pedidos', valor: kpis?.totalPedidos ?? 0, cor: _azul),
+      _KpiCard(icone: Icons.check_box, corIcone: const Color(0xFF43A047), titulo: 'Entregues Hoje', valor: kpis?.entreguesHoje ?? 0, cor: _dourado),
+      _KpiCard(icone: Icons.circle, corIcone: const Color(0xFFE53935), titulo: 'Urgentes em Aberto', valor: kpis?.urgentesAberto ?? 0, cor: _vermelho),
+      _KpiCard(icone: Icons.shopping_bag, corIcone: const Color(0xFFD81B60), titulo: 'Produtos no Catálogo', valor: kpis?.totalProdutos ?? 0, cor: _roxo),
     ];
 
     final graficoVolume = _Painel(
@@ -262,7 +270,7 @@ class _KpiCard extends StatelessWidget {
   final IconData icone;
   final Color corIcone;
   final String titulo;
-  final dynamic valor;
+  final int valor;
   final Color cor;
 
   const _KpiCard({
@@ -370,13 +378,13 @@ const _estiloEixo = TextStyle(fontSize: 12, color: _cinzaTexto);
 
 // Equivalente ao GraficoVolumeDiario.jsx (gráfico de área)
 class _GraficoVolumeDiario extends StatelessWidget {
-  final List<dynamic> dados;
+  final List<VolumeDiarioModel> dados;
 
   const _GraficoVolumeDiario({required this.dados});
 
   @override
   Widget build(BuildContext context) {
-    final valores = dados.map((d) => (d['pedidos'] as num?)?.toInt() ?? 0).toList();
+    final valores = dados.map((d) => d.pedidos).toList();
     final escala = _escala(valores);
 
     return LineChart(
@@ -417,7 +425,7 @@ class _GraficoVolumeDiario extends StatelessWidget {
                 if (i < 0 || i >= dados.length || valor != i) return const SizedBox.shrink();
                 return SideTitleWidget(
                   meta: meta,
-                  child: Text(dados[i]['data']?.toString() ?? '', style: _estiloEixo),
+                  child: Text(dados[i].data, style: _estiloEixo),
                 );
               },
             ),
@@ -430,7 +438,7 @@ class _GraficoVolumeDiario extends StatelessWidget {
             tooltipPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             getTooltipItems: (pontos) => pontos
                 .map((p) => LineTooltipItem(
-                      '${dados[p.x.toInt()]['data']}\n',
+                      '${dados[p.x.toInt()].data}\n',
                       const TextStyle(color: _fundo, fontWeight: FontWeight.w700, fontSize: 13),
                       children: [
                         TextSpan(
@@ -482,13 +490,13 @@ class _GraficoVolumeDiario extends StatelessWidget {
 
 // Equivalente ao GraficoProdutos.jsx (barras horizontais)
 class _GraficoProdutos extends StatelessWidget {
-  final List<dynamic> dados;
+  final List<ProdutoRankingModel> dados;
 
   const _GraficoProdutos({required this.dados});
 
   @override
   Widget build(BuildContext context) {
-    final valores = dados.map((d) => (d['pedidos'] as num?)?.toInt() ?? 0).toList();
+    final valores = dados.map((d) => d.pedidos).toList();
     final escala = _escala(valores);
 
     // O gráfico é desenhado na vertical e girado 90°: os nomes (eixo de baixo)
@@ -532,7 +540,7 @@ class _GraficoProdutos extends StatelessWidget {
                   child: SizedBox(
                     width: 145,
                     child: Text(
-                      dados[i]['nome']?.toString() ?? '',
+                      dados[i].nome,
                       textAlign: TextAlign.right,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -550,7 +558,7 @@ class _GraficoProdutos extends StatelessWidget {
             tooltipBorderRadius: BorderRadius.circular(4),
             tooltipPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             getTooltipItem: (grupo, indiceGrupo, barra, indiceBarra) => BarTooltipItem(
-              '${dados[grupo.x]['nome']}\n',
+              '${dados[grupo.x].nome}\n',
               const TextStyle(color: _fundo, fontWeight: FontWeight.w700, fontSize: 13),
               children: [
                 TextSpan(

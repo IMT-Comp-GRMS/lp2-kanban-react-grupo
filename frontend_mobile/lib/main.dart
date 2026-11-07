@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dashboard_screen.dart';
+import 'models/historico_model.dart';
+import 'models/pedido_model.dart';
+import 'models/produto_model.dart';
 
 void main() {
   runApp(const VelatoApp());
@@ -36,8 +39,8 @@ class _KanbanScreenState extends State<KanbanScreen> {
   // Serviço Criar_Pedido (pedidos do kanban)
   static const String pedidosUrl = 'http://localhost:30000'; // NodePort do criar-pedido-service
 
-  List<dynamic> produtos = [];
-  List<dynamic> pedidos = [];
+  List<ProdutoModel> produtos = [];
+  List<PedidoModel> pedidos = [];
   bool carregando = true;
   String? mensagemErro;
 
@@ -77,14 +80,15 @@ class _KanbanScreenState extends State<KanbanScreen> {
   }
 
   // Mesmo critério do App.jsx: o termo aparece no título (produtos) ou no responsável
-  bool passaNosFiltros(dynamic pedido) {
+  bool passaNosFiltros(PedidoModel pedido) {
     if (termoBusca.isNotEmpty) {
       final termo = termoBusca.toLowerCase();
-      final titulo = (pedido['titulo'] ?? '').toString().toLowerCase();
-      final responsavel = (pedido['responsavel'] ?? '').toString().toLowerCase();
-      if (!titulo.contains(termo) && !responsavel.contains(termo)) return false;
+      if (!pedido.titulo.toLowerCase().contains(termo) &&
+          !pedido.responsavel.toLowerCase().contains(termo)) {
+        return false;
+      }
     }
-    if (filtroPrioridade != null && pedido['prioridade'] != filtroPrioridade) return false;
+    if (filtroPrioridade != null && pedido.prioridade != filtroPrioridade) return false;
     return true;
   }
 
@@ -169,7 +173,8 @@ class _KanbanScreenState extends State<KanbanScreen> {
       if (resposta.statusCode == 200) {
         final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
         setState(() {
-          produtos = dados;
+          // cada item do JSON vira um objeto da classe modelo
+          produtos = dados.map((json) => ProdutoModel.fromJSON(json)).toList();
         });
       } else {
         setState(() {
@@ -197,7 +202,8 @@ class _KanbanScreenState extends State<KanbanScreen> {
       if (resposta.statusCode == 200) {
         final List<dynamic> dados = jsonDecode(utf8.decode(resposta.bodyBytes));
         setState(() {
-          pedidos = dados;
+          // cada item do JSON vira um objeto da classe modelo
+          pedidos = dados.map((json) => PedidoModel.fromJSON(json)).toList();
           carregando = false;
         });
       } else {
@@ -216,7 +222,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
   }
 
   // DELETE /tarefas/:id (excluir pedido, com confirmação igual ao window.confirm do React)
-  Future<void> excluirPedido(dynamic pedido) async {
+  Future<void> excluirPedido(PedidoModel pedido) async {
     final confirmou = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -225,7 +231,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
           'Excluir pedido',
           style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF252623)),
         ),
-        content: Text('Tem certeza que deseja excluir o pedido "${pedido['titulo']}"?'),
+        content: Text('Tem certeza que deseja excluir o pedido "${pedido.titulo}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -245,7 +251,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
     if (confirmou != true) return;
 
     try {
-      final resposta = await http.delete(Uri.parse('$pedidosUrl/tarefas/${pedido['id']}'));
+      final resposta = await http.delete(Uri.parse('$pedidosUrl/tarefas/${pedido.id}'));
 
       if (!mounted) return;
       if (resposta.statusCode == 200) {
@@ -276,14 +282,14 @@ class _KanbanScreenState extends State<KanbanScreen> {
   }
 
   // PUT /tarefas/:id (mover pedido de coluna)
-  Future<void> moverPedido(dynamic pedido, String novoStatus) async {
+  Future<void> moverPedido(PedidoModel pedido, String novoStatus) async {
     try {
       final resposta = await http.put(
-        Uri.parse('$pedidosUrl/tarefas/${pedido['id']}'),
+        Uri.parse('$pedidosUrl/tarefas/${pedido.id}'),
         headers: {'Content-Type': 'application/json; charset=utf-8'},
         body: jsonEncode({
           'status': novoStatus,
-          'status_anterior': pedido['status'],
+          'status_anterior': pedido.status,
         }),
       );
 
@@ -525,7 +531,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                       const Text('Nenhum produto no catálogo.', style: TextStyle(color: Colors.grey, fontSize: 13))
                     else
                       ...produtos.map((produto) {
-                        final int id = (produto['id'] as num).toInt();
+                        final int id = produto.id;
                         return CheckboxListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
@@ -542,7 +548,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                             });
                           },
                           title: Text(
-                            '${produto['nome']} (R\$ ${produto['preco']})',
+                            '${produto.nome} (R\$ ${produto.preco.toStringAsFixed(2)})',
                             style: const TextStyle(fontSize: 14),
                           ),
                         );
@@ -777,11 +783,10 @@ class _KanbanScreenState extends State<KanbanScreen> {
                     itemBuilder: (context, index) {
                       final coluna = colunas[index];
                       final itensDaColuna = pedidos
-                          .where((p) => p['status'] == coluna['titulo'])
+                          .where((p) => p.status == coluna['titulo'])
                           .where(passaNosFiltros)
                           .toList()
-                        ..sort((a, b) => ((a['prioridade'] ?? 3) as num)
-                            .compareTo((b['prioridade'] ?? 3) as num));
+                        ..sort((a, b) => a.prioridade.compareTo(b.prioridade));
 
                       return Container(
                         width: 300,
@@ -829,7 +834,7 @@ class _KanbanScreenState extends State<KanbanScreen> {
                                       itemBuilder: (context, i) {
                                         final pedido = itensDaColuna[i];
                                         return CardPedidoWidget(
-                                          key: ValueKey(pedido['id']),
+                                          key: ValueKey(pedido.id),
                                           pedido: pedido,
                                           onExcluir: () => excluirPedido(pedido),
                                           onVoltar: index > 0
@@ -856,14 +861,12 @@ class _KanbanScreenState extends State<KanbanScreen> {
 }
 
 class CardProdutoWidget extends StatelessWidget {
-  final dynamic produto;
+  final ProdutoModel produto;
 
   const CardProdutoWidget({super.key, required this.produto});
   @override
   Widget build(BuildContext context) {
-    final double preco = (produto['preco'] is num)
-        ? (produto['preco'] as num).toDouble()
-        : double.tryParse(produto['preco'].toString()) ?? 0.0;
+    final double preco = produto.preco;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -885,7 +888,7 @@ class CardProdutoWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'ID: ${produto['id']}',
+                'ID: ${produto.id}',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -897,7 +900,7 @@ class CardProdutoWidget extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            produto['nome']?.toString() ?? 'Sem nome',
+            produto.nome,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
           const SizedBox(height: 6),
@@ -916,7 +919,7 @@ class CardProdutoWidget extends StatelessWidget {
 }
 
 class CardPedidoWidget extends StatefulWidget {
-  final dynamic pedido;
+  final PedidoModel pedido;
   // null quando o pedido já está na primeira/última coluna
   final VoidCallback? onVoltar;
   final VoidCallback? onAvancar;
@@ -944,7 +947,7 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
   // Microsserviço Histórico (NodePort do historico-service)
   static const String historicoUrl = 'http://localhost:30005';
 
-  List<dynamic> historico = [];
+  List<HistoricoModel> historico = [];
   bool mostrarHistorico = false;
   bool carregandoHistorico = false;
 
@@ -956,14 +959,15 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
     }
 
     setState(() => carregandoHistorico = true);
-    List<dynamic> dados = [];
+    List<HistoricoModel> dados = [];
     try {
       final resposta = await http.get(
-        Uri.parse('$historicoUrl/historico/${widget.pedido['id']}'),
+        Uri.parse('$historicoUrl/historico/${widget.pedido.id}'),
       );
       // O serviço responde 404 quando o pedido ainda não tem movimentações
       if (resposta.statusCode == 200) {
-        dados = jsonDecode(utf8.decode(resposta.bodyBytes));
+        final List<dynamic> json = jsonDecode(utf8.decode(resposta.bodyBytes));
+        dados = json.map((item) => HistoricoModel.fromJSON(item)).toList();
       }
     } catch (e) {
       dados = [];
@@ -981,9 +985,8 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
     final pedido = widget.pedido;
     final onVoltar = widget.onVoltar;
     final onAvancar = widget.onAvancar;
-    final int prioridade = (pedido['prioridade'] as num?)?.toInt() ?? 3;
-    final Color corBorda = CardPedidoWidget.coresPrioridade[prioridade] ?? const Color(0xFF3C5262);
-    final String descricao = pedido['descricao']?.toString() ?? '';
+    final Color corBorda = CardPedidoWidget.coresPrioridade[pedido.prioridade] ?? const Color(0xFF3C5262);
+    final String descricao = pedido.descricao;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1004,7 +1007,7 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
             children: [
               Expanded(
                 child: Text(
-                  'ID: ${pedido['id']}',
+                  'ID: ${pedido.id}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1026,7 +1029,7 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
           ),
           const SizedBox(height: 8),
           Text(
-            pedido['titulo']?.toString() ?? 'Pedido',
+            pedido.titulo,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           if (descricao.isNotEmpty) ...[
@@ -1038,7 +1041,7 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
           ],
           const SizedBox(height: 6),
           Text(
-            'Responsável: ${pedido['responsavel'] ?? ''}',
+            'Responsável: ${pedido.responsavel}',
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -1159,15 +1162,15 @@ class _CardPedidoWidgetState extends State<CardPedidoWidget> {
                       ),
                       children: [
                         _CelulaHistorico(
-                          linha['status_anterior']?.toString() ?? '—',
+                          linha.statusAnterior,
                           cor: const Color(0xFFAE4F48),
                         ),
                         _CelulaHistorico(
-                          linha['status_novo']?.toString() ?? '',
+                          linha.statusNovo,
                           cor: const Color(0xFF3C5262),
                         ),
                         _CelulaHistorico(
-                          linha['data_hora']?.toString() ?? '',
+                          linha.dataHora,
                           cor: const Color(0xFF6B7280),
                         ),
                       ],
