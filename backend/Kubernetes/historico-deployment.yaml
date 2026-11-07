@@ -46,3 +46,19 @@ spec:
       targetPort: 5001
       # porta fixa de acesso externo: http://localhost:30005
       nodePort: 30005
+---
+# Service interno (ClusterIP), como o lembretes-clusterip-service da seção
+# 4.3.72.1 da apostila de Microsserviços: é por ele que o barramento fala com
+# este serviço dentro do cluster. O NodePort acima continua para o acesso de fora.
+apiVersion: v1
+kind: Service
+metadata:
+  name: historico-clusterip-service
+spec:
+  selector:
+    app: historico
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 5001
+      targetPort: 5001

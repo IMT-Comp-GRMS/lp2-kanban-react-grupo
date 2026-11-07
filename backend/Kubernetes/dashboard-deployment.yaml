@@ -49,3 +49,19 @@ spec:
       targetPort: 4000
       # porta fixa de acesso externo: http://localhost:30004
       nodePort: 30004
+---
+# Service interno (ClusterIP), como o lembretes-clusterip-service da seção
+# 4.3.72.1 da apostila de Microsserviços: é por ele que o barramento fala com
+# este serviço dentro do cluster. O NodePort acima continua para o acesso de fora.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-clusterip-service
+spec:
+  selector:
+    app: dashboard
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000

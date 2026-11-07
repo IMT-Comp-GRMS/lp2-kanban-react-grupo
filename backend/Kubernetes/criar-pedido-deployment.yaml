@@ -46,3 +46,19 @@ spec:
       targetPort: 3000
       # porta fixa de acesso externo: http://localhost:30000
       nodePort: 30000
+---
+# Service interno (ClusterIP), como o lembretes-clusterip-service da seção
+# 4.3.72.1 da apostila de Microsserviços: é por ele que o barramento fala com
+# este serviço dentro do cluster. O NodePort acima continua para o acesso de fora.
+apiVersion: v1
+kind: Service
+metadata:
+  name: criar-pedido-clusterip-service
+spec:
+  selector:
+    app: criar-pedido
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000

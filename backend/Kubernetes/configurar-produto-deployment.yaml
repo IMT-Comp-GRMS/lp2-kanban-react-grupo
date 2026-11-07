@@ -65,3 +65,19 @@ spec:
       targetPort: 3001
       # porta fixa de acesso externo: http://localhost:30001
       nodePort: 30001
+---
+# Service interno (ClusterIP), como o lembretes-clusterip-service da seção
+# 4.3.72.1 da apostila de Microsserviços: é por ele que o barramento fala com
+# este serviço dentro do cluster. O NodePort acima continua para o acesso de fora.
+apiVersion: v1
+kind: Service
+metadata:
+  name: configurar-produto-clusterip-service
+spec:
+  selector:
+    app: configurar-produto
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
