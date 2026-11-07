@@ -17,6 +17,7 @@ require('dotenv').config();
 const express = require('express');
 const mysql   = require('mysql2/promise');
 const cors    = require('cors');
+const axios   = require('axios');
 
 const app = express();
 app.use(cors());
@@ -43,6 +44,9 @@ async function conectar() {
         password: process.env.PASSWORD,
         database: process.env.DATABASE,
         charset:  'utf8mb4',
+        // Mesmo fuso do MySQL (--default-time-zone=-03:00) para as datas que
+        // chegam nos eventos (data_criacao, data_movimentacao).
+        timezone: '-03:00',
         connectionLimit: 10,
     });
     try {
@@ -52,7 +56,8 @@ async function conectar() {
         console.error('⚠️ MySQL ainda indisponível; o pool tentará de novo na próxima requisição:', erro.message);
     }
 }
-conectar();
+// Guarda a Promise para a recuperação de eventos esperar o banco.
+const conectado = conectar();
 
 // ============================================================================
 // ROTA DE SAÚDE
@@ -198,14 +203,19 @@ const funcoes = {
         try {
             const sqlPedido = `
                 INSERT INTO pedidos (id, responsavel, status, prioridade, data_criacao)
-                VALUES (?, ?, ?, ?, NOW())
+                VALUES (?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE status = VALUES(status)
             `;
+            // Usa a data real do pedido (enviada pelo Criar_Pedido) e não a hora
+            // em que o evento foi processado, para o gráfico de volume diário
+            // ficar certo quando o evento é reprocessado depois.
+            const dataCriacao = dados.data_criacao ? new Date(dados.data_criacao) : new Date();
             await conexao.query(sqlPedido, [
                 dados.id,
                 dados.responsavel ?? null,
                 dados.status     ?? 'Pedidos',
                 dados.prioridade ?? 3,
+                dataCriacao,
             ]);
 
             if (Array.isArray(dados.produtosIds) && dados.produtosIds.length > 0) {
@@ -227,11 +237,21 @@ const funcoes = {
         try {
             const entregue = dados.status_novo === 'Pedido Entregue';
 
-            const sql = entregue
-                ? 'UPDATE pedidos SET status = ?, data_entrega = NOW() WHERE id = ?'
-                : 'UPDATE pedidos SET status = ?                       WHERE id = ?';
+            // Data real da movimentação (enviada pelo Criar_Pedido); eventos
+            // antigos, sem a data, usam a hora atual.
+            const dataMov = dados.data_movimentacao ? new Date(dados.data_movimentacao) : new Date();
 
-            await conexao.query(sql, [dados.status_novo, dados.pedido_id]);
+            if (entregue) {
+                await conexao.query(
+                    'UPDATE pedidos SET status = ?, data_entrega = ? WHERE id = ?',
+                    [dados.status_novo, dataMov, dados.pedido_id]
+                );
+            } else {
+                await conexao.query(
+                    'UPDATE pedidos SET status = ? WHERE id = ?',
+                    [dados.status_novo, dados.pedido_id]
+                );
+            }
             console.log(`🔄 Pedido ${dados.pedido_id}: "${dados.status_anterior}" → "${dados.status_novo}"`);
         } catch (erro) {
             console.error('❌ Erro ao processar evento "PedidoMovido":', erro);
@@ -267,9 +287,32 @@ app.post('/eventos', async (req, res) => {
 });
 
 // ============================================================================
+// RECUPERAÇÃO DE EVENTOS PERDIDOS
+// ============================================================================
+// Apostila Microsserviços 4.3.51: ao subir, pede ao barramento os eventos
+// guardados e processa cada um. As consultas usam ON DUPLICATE KEY / INSERT
+// IGNORE pelo id do pedido ou produto, então reprocessar não duplica linhas.
+async function recuperarEventos() {
+    try {
+        const resposta = await axios.get('http://barramento-service:10000/eventos');
+        console.log(`🔁 Recuperando ${resposta.data.length} evento(s) do barramento...`);
+        for (const evento of resposta.data) {
+            try {
+                await funcoes[evento.tipo](evento.dados);
+            } catch (err) {}
+        }
+    } catch (erro) {
+        // O barramento pode ainda não estar no ar quando este serviço sobe.
+        console.error('⚠️ Não foi possível recuperar eventos do barramento:', erro.message);
+    }
+}
+
+// ============================================================================
 // INICIALIZAÇÃO DO SERVIDOR
 // ============================================================================
 const PORTA = process.env.PORT || 4000;
-app.listen(PORTA, () => {
+app.listen(PORTA, async () => {
     console.log(`🚀 Dashboard rodando na porta ${PORTA}`);
+    await conectado;
+    await recuperarEventos();
 });

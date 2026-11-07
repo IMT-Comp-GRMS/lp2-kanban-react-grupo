@@ -40,6 +40,9 @@ async function conectar() {
         user: process.env.USERBD,
         password: process.env.PASSWORD,
         database: process.env.DATABASE,
+        // Mesmo fuso do MySQL (--default-time-zone=-03:00): datas lidas do banco
+        // e enviadas nos eventos ficam no horário de Brasília.
+        timezone: '-03:00',
         connectionLimit: 10
     });
     try {
@@ -49,7 +52,8 @@ async function conectar() {
         console.error('⚠️ MySQL ainda indisponível; o pool tentará de novo na próxima requisição:', erro.message);
     }
 }
-conectar();
+// Guarda a Promise para a recuperação de eventos esperar o banco.
+const conectado = conectar();
 
 /**
  * ============================================================================
@@ -149,7 +153,10 @@ app.post('/tarefas', async (req, res) => {
                 responsavel,
                 status: statusInicial,
                 prioridade,
-                produtosIds: produtosIds ?? []
+                produtosIds: produtosIds ?? [],
+                // Data real da criação: se o Dashboard reprocessar o evento
+                // depois, ele usa esta data e não a hora do reprocessamento.
+                data_criacao: new Date()
             }
         }).catch(err => console.log('Barramento fora do ar:', err.message));
             
@@ -188,7 +195,10 @@ app.put('/tarefas/:id', async (req, res) => {
             dados: {
                 pedido_id: idDoPedido,
                 status_anterior: status_anterior,
-                status_novo: status
+                status_novo: status,
+                // Data real da movimentação, usada pelo Historico (data_hora) e
+                // pelo Dashboard (data_entrega) mesmo quando reprocessam depois.
+                data_movimentacao: new Date()
             }
         }).catch(err => console.log('Barramento fora do ar:', err.message));
 
@@ -306,7 +316,8 @@ app.post('/sincronizar', async (req, res) => {
                     responsavel: pedido.responsavel,
                     status: pedido.status,
                     prioridade: pedido.prioridade,
-                    produtosIds: itens.map(i => i.produto_id)
+                    produtosIds: itens.map(i => i.produto_id),
+                    data_criacao: pedido.data_criacao
                 }
             }).catch(err => console.log('Erro ao publicar pedido:', err.message));
         }
@@ -318,6 +329,31 @@ app.post('/sincronizar', async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
+/**
+ * ============================================================================
+ * RECUPERAÇÃO DE EVENTOS PERDIDOS
+ * ============================================================================
+ * Apostila Microsserviços 4.3.51: ao subir, pede ao barramento os eventos
+ * guardados e processa cada um. O ON DUPLICATE KEY UPDATE do ProdutoCriado
+ * faz com que reprocessar um produto já espelhado não crie linha nova.
+ */
+async function recuperarEventos() {
+    try {
+        const resposta = await axios.get('http://barramento-service:10000/eventos');
+        console.log(`🔁 Recuperando ${resposta.data.length} evento(s) do barramento...`);
+        for (const evento of resposta.data) {
+            try {
+                await funcoes[evento.tipo](evento.dados);
+            } catch (err) {}
+        }
+    } catch (erro) {
+        // O barramento pode ainda não estar no ar quando este serviço sobe.
+        console.error('⚠️ Não foi possível recuperar eventos do barramento:', erro.message);
+    }
+}
+
+app.listen(3000, async () => {
     console.log('Criar_Pedido. Porta 3000')
+    await conectado;
+    await recuperarEventos();
 })

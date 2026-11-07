@@ -27,6 +27,9 @@ async function conectar() {
         password: process.env.PASSWORD,
         database: process.env.DATABASE,
         charset: 'utf8mb4',
+        // Mesmo fuso do MySQL (--default-time-zone=-03:00): a data que vem no
+        // evento é gravada no horário de Brasília, igual ao NOW() do banco.
+        timezone: '-03:00',
         connectionLimit: 10
     });
     try {
@@ -54,8 +57,12 @@ const funcoes = {
     // foi gravado é ignorado, então reprocessar os eventos não duplica linhas.
     PedidoMovido: async (dados, eventoId) => {
         try {
-            const sql = 'INSERT IGNORE INTO historico (evento_id, pedido_id, status_anterior, status_novo) VALUES (?, ?, ?, ?)';
-            const [resultado] = await conexao.query(sql, [eventoId ?? null, dados.pedido_id, dados.status_anterior, dados.status_novo]);
+            // data_hora vem do evento (hora real em que o pedido foi movido),
+            // para não gravar a hora do reprocessamento. Eventos antigos, sem a
+            // data, usam a hora atual.
+            const dataHora = dados.data_movimentacao ? new Date(dados.data_movimentacao) : new Date();
+            const sql = 'INSERT IGNORE INTO historico (evento_id, pedido_id, status_anterior, status_novo, data_hora) VALUES (?, ?, ?, ?, ?)';
+            const [resultado] = await conexao.query(sql, [eventoId ?? null, dados.pedido_id, dados.status_anterior, dados.status_novo, dataHora]);
             if (resultado.affectedRows === 0) {
                 console.log(`↩️ Evento ${eventoId} já registrado; ignorado.`);
                 return;
