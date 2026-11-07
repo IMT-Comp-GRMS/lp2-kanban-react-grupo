@@ -10,12 +10,23 @@
 const BASE_URL = 'http://localhost:30004'; // nodePort do dashboard-service
 
 /**
+ * Faz o GET e lança erro se o serviço responder com status de falha (ex.: 500),
+ * para o App.jsx mostrar a mensagem de erro em vez de tratar o corpo como dado.
+ */
+async function buscarJson(caminho) {
+  const response = await fetch(`${BASE_URL}${caminho}`);
+  if (!response.ok) {
+    throw new Error(`Falha ao buscar ${caminho}: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
  * Busca os KPIs principais para os cards do topo.
  * @returns {{ totalPedidos, entreguesHoje, urgentesAberto, totalProdutos }}
  */
 export async function buscarKpis() {
-  const response = await fetch(`${BASE_URL}/dashboard/kpis`);
-  return response.json();
+  return buscarJson('/dashboard/kpis');
 }
 
 /**
@@ -23,8 +34,7 @@ export async function buscarKpis() {
  * @returns {Array<{ data: string, pedidos: number }>}
  */
 export async function buscarVolumeDiario() {
-  const response = await fetch(`${BASE_URL}/dashboard/volume-diario`);
-  return response.json();
+  return buscarJson('/dashboard/volume-diario');
 }
 
 /**
@@ -32,6 +42,5 @@ export async function buscarVolumeDiario() {
  * @returns {Array<{ nome: string, pedidos: number }>}
  */
 export async function buscarProdutosMaisPedidos() {
-  const response = await fetch(`${BASE_URL}/dashboard/produtos-mais-pedidos`);
-  return response.json();
+  return buscarJson('/dashboard/produtos-mais-pedidos');
 }

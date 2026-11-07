@@ -30,28 +30,36 @@ const App = () => {
   const [volumeDiario, setVolumeDiario] = useState([]);
   const [produtosMaisPedidos, setProdutosMaisPedidos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  // true quando a busca falhou (ex.: serviço Dashboard fora do ar). Antes, o
+  // erro só ia para o console e a página quebrava ao ler kpis.totalPedidos.
+  const [erro, setErro] = useState(false);
 
   /* ==========================================================================
      CARREGAMENTO DE DADOS
      ========================================================================== */
-  useEffect(() => {
-    async function carregarDados() {
-      try {
-        // Todas as chamadas em paralelo para máxima performance
-        const [dadosKpis, dadosVolume, dadosProdutos] = await Promise.all([
-          buscarKpis(),
-          buscarVolumeDiario(),
-          buscarProdutosMaisPedidos(),
-        ]);
-        setKpis(dadosKpis);
-        setVolumeDiario(dadosVolume);
-        setProdutosMaisPedidos(dadosProdutos);
-      } catch (erro) {
-        console.error('Erro ao carregar dados do dashboard:', erro);
-      } finally {
-        setCarregando(false);
-      }
+  // Fora do useEffect para o botão "Tentar novamente" poder chamar de novo.
+  async function carregarDados() {
+    setCarregando(true);
+    setErro(false);
+    try {
+      // Todas as chamadas em paralelo para máxima performance
+      const [dadosKpis, dadosVolume, dadosProdutos] = await Promise.all([
+        buscarKpis(),
+        buscarVolumeDiario(),
+        buscarProdutosMaisPedidos(),
+      ]);
+      setKpis(dadosKpis);
+      setVolumeDiario(dadosVolume);
+      setProdutosMaisPedidos(dadosProdutos);
+    } catch (erro) {
+      console.error('Erro ao carregar dados do dashboard:', erro);
+      setErro(true);
+    } finally {
+      setCarregando(false);
     }
+  }
+
+  useEffect(() => {
     carregarDados();
   }, []);
 
@@ -125,6 +133,24 @@ const App = () => {
         <div style={{ fontSize: '18px', color: '#3c5262', fontWeight: '600' }}>
           Carregando dashboard...
         </div>
+      </div>
+    );
+  }
+
+  // Falha na busca: mensagem e botão para tentar de novo, como a tela de
+  // Dashboard do app Flutter já faz.
+  if (erro || !kpis) {
+    return (
+      <div style={{ ...containerStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+        <div style={{ fontSize: '16px', color: '#ae4f48', fontWeight: '600' }}>
+          Não foi possível carregar o dashboard. Verifique se o serviço está no ar.
+        </div>
+        <button
+          onClick={carregarDados}
+          style={{ padding: '8px 20px', backgroundColor: '#3c5262', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+        >
+          Tentar novamente
+        </button>
       </div>
     );
   }
