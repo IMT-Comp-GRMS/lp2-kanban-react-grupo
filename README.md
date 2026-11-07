@@ -62,7 +62,7 @@ Cada pedido aparece como um cartão no quadro, mostrando os produtos incluídos,
 Visão estratégica do seu negócio em tempo real, sem precisar abrir uma única planilha.
 
 **Indicadores principais (KPIs):**
-- Total de pedidos em aberto
+- Total de pedidos registrados
 - Pedidos entregues hoje
 - Pedidos urgentes aguardando ação
 - Total de produtos cadastrados no catálogo
@@ -70,6 +70,20 @@ Visão estratégica do seu negócio em tempo real, sem precisar abrir uma única
 **Gráfico de volume dos últimos 7 dias:** Acompanhe o ritmo da sua operação dia a dia e antecipe picos de demanda antes que virem problema.
 
 **Ranking dos produtos mais pedidos:** Descubra quais produtos lideram as vendas e tome decisões de estoque e reposição com base em dados reais — não em suposições.
+
+---
+
+### Velato Flow no celular
+
+Sua operação não para quando você sai do computador — e o Velato Flow também não. O **app para celular** traz o quadro Kanban e o painel gerencial completos para a palma da mão:
+
+- Acompanhe os pedidos em tempo real, de onde estiver.
+- Cadastre produtos e crie pedidos na hora em que a venda acontece.
+- Avance, retroceda ou cancele um pedido com um toque, com confirmação para evitar erros.
+- Consulte o histórico de cada pedido e encontre qualquer um pela busca ou pela prioridade.
+- Abra o painel gerencial com indicadores e gráficos, em uma tela pensada para o celular.
+
+Tudo o que é feito no celular aparece no computador, e vice-versa: é o mesmo sistema, sempre sincronizado.
 
 ---
 
@@ -82,3 +96,77 @@ Se você vende online e quer operar com a eficiência de uma grande empresa sem 
 ---
 
 *Velato Flow — porque faturar mais começa por errar menos.*
+
+---
+
+## Como o Velato Flow funciona por dentro
+
+O sistema segue a **arquitetura de microsserviços**: cada parte do negócio é um serviço independente, com o seu próprio banco de dados. Os serviços conversam entre si por um **barramento de eventos** (ex.: "produto criado", "pedido movido"), então a queda de um não derruba os outros.
+
+| Componente | Tecnologia | Responsabilidade | Banco |
+|---|---|---|---|
+| Configurar_Produto | **Dart** (shelf) | Catálogo de produtos | `BD_Produtos` |
+| Criar_Pedido | Node.js (Express) | Criar, listar, mover e excluir pedidos | `KanBan` |
+| Historico | Node.js (Express) | Registrar cada movimentação dos pedidos | `BD_Historico` |
+| Dashboard | Node.js (Express) | Indicadores e gráficos do painel | `BD_DashBoard` |
+| Barramento | Node.js (Express) | Repassar os eventos entre os serviços | — |
+| Banco de dados | MySQL 8 | Cria os 4 bancos sozinho na primeira subida | — |
+| App mobile | **Flutter** | Kanban + Dashboard no celular | — |
+| Kanban web / Dashboard web | React | Kanban e painel no navegador | — |
+
+Todo o Back End roda em **contêineres Docker** e é implantado no **Kubernetes**.
+
+### Estrutura do repositório
+
+```
+backend/
+  Barramento/  Criar_Pedido/  Historico/  Dashboard/   serviços Node.js (cada um com Dockerfile)
+  configurar_produto_dart/                              serviço Configurar_Produto em Dart
+  Configurar_Produto/                                   versão original em Node (Parte 1)
+  MySQL/                                                imagem do banco + script de criação
+  Kubernetes/                                           arquivos de implantação (.yaml)
+frontend/            Kanban web (React)
+frontend-dashboard/  Dashboard web (React)
+frontend_mobile/     App para celular (Flutter)
+```
+
+---
+
+## Como executar
+
+**Pré-requisitos:** Docker Desktop com Kubernetes habilitado no modo **kubeadm** (*Settings → Kubernetes*), Flutter e Node.js.
+
+**1. Gerar as imagens Docker** (a partir da pasta `backend`):
+
+```powershell
+cd backend\Barramento;         docker build -t barramento .
+cd ..\Criar_Pedido;            docker build -t criar-pedido .
+cd ..\Historico;               docker build -t historico .
+cd ..\Dashboard;               docker build -t dashboard .
+cd ..\configurar_produto_dart; docker build -t configurar-produto-dart:latest .
+cd ..\MySQL;                   docker build -t mysql-velato .
+```
+
+**2. Implantar no Kubernetes** (os bancos são criados automaticamente):
+
+```powershell
+kubectl apply -f backend\Kubernetes\
+kubectl get pods        # aguardar todos ficarem "Running"
+```
+
+**3. Acessar.** Os serviços ficam disponíveis direto no computador, em portas fixas:
+
+| Serviço | Endereço |
+|---|---|
+| Criar_Pedido | http://localhost:30000 |
+| Configurar_Produto | http://localhost:30001 |
+| Dashboard | http://localhost:30004 |
+| Historico | http://localhost:30005 |
+
+**4. Abrir as telas** (cada uma em um terminal):
+
+```powershell
+cd frontend_mobile;    flutter pub get; flutter run -d chrome   # app para celular
+cd frontend;           npm install;     npm run dev             # Kanban web    → http://localhost:5173
+cd frontend-dashboard; npm install;     npm run dev             # Dashboard web → http://localhost:5174
+```
