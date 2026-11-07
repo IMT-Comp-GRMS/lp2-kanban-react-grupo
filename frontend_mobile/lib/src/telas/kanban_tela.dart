@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../dashboard_screen.dart';
+import 'dashboard_tela.dart';
 import '../models/historico_model.dart';
 import '../models/pedido_model.dart';
 import '../models/produto_model.dart';
