@@ -172,20 +172,15 @@ app.get('/dashboard/produtos-mais-pedidos', async (_req, res) => {
 });
 
 // ============================================================================
-// RECEPTOR DE EVENTOS DO BARRAMENTO
-// POST /eventos
+// MAPA DE FUNÇÕES POR TIPO DE EVENTO
 // ============================================================================
-app.post('/eventos', async (req, res) => {
-    // Responde imediatamente para não bloquear o Barramento
-    res.status(200).json({ msg: 'ok' });
-
-    const { tipo, dados } = req.body;
-
-    try {
-        // ------------------------------------------------------------------
-        // ProdutoCriado — espelha o catálogo de produtos
-        // ------------------------------------------------------------------
-        if (tipo === 'ProdutoCriado') {
+// Padrão da apostila Microsserviços 4.3.37 e 4.3.47: cada tipo de evento é uma
+// chave do objeto `funcoes`. Cada função tem seu próprio try/catch para que
+// erros de banco apareçam no log (o catch da rota é vazio de propósito).
+const funcoes = {
+    // ProdutoCriado — espelha o catálogo de produtos
+    ProdutoCriado: async (dados) => {
+        try {
             const sql = `
                 INSERT INTO produtos (id, nome, preco)
                 VALUES (?, ?, ?)
@@ -193,12 +188,14 @@ app.post('/eventos', async (req, res) => {
             `;
             await conexao.query(sql, [dados.id, dados.nome, dados.preco]);
             console.log(`📦 Produto espelhado: "${dados.nome}" (id ${dados.id})`);
+        } catch (erro) {
+            console.error('❌ Erro ao processar evento "ProdutoCriado":', erro);
         }
+    },
 
-        // ------------------------------------------------------------------
-        // PedidoCriado — registra o pedido e seus itens
-        // ------------------------------------------------------------------
-        else if (tipo === 'PedidoCriado') {
+    // PedidoCriado — registra o pedido e seus itens
+    PedidoCriado: async (dados) => {
+        try {
             const sqlPedido = `
                 INSERT INTO pedidos (id, responsavel, status, prioridade, data_criacao)
                 VALUES (?, ?, ?, ?, NOW())
@@ -220,12 +217,14 @@ app.post('/eventos', async (req, res) => {
             }
 
             console.log(`🧾 Pedido registrado no dashboard: id ${dados.id}`);
+        } catch (erro) {
+            console.error('❌ Erro ao processar evento "PedidoCriado":', erro);
         }
+    },
 
-        // ------------------------------------------------------------------
-        // PedidoMovido — atualiza status; registra data de entrega se aplicável
-        // ------------------------------------------------------------------
-        else if (tipo === 'PedidoMovido') {
+    // PedidoMovido — atualiza status; registra data de entrega se aplicável
+    PedidoMovido: async (dados) => {
+        try {
             const entregue = dados.status_novo === 'Pedido Entregue';
 
             const sql = entregue
@@ -234,17 +233,37 @@ app.post('/eventos', async (req, res) => {
 
             await conexao.query(sql, [dados.status_novo, dados.pedido_id]);
             console.log(`🔄 Pedido ${dados.pedido_id}: "${dados.status_anterior}" → "${dados.status_novo}"`);
+        } catch (erro) {
+            console.error('❌ Erro ao processar evento "PedidoMovido":', erro);
         }
+    },
 
-        else if (tipo === 'PedidoDeletado') {
+    // PedidoDeletado — remove o pedido (os itens saem pelo ON DELETE CASCADE)
+    PedidoDeletado: async (dados) => {
+        try {
             await conexao.query('DELETE FROM pedidos WHERE id = ?', [dados.pedido_id]);
             console.log(`🗑️ Pedido ${dados.pedido_id} removido do dashboard.`);
+        } catch (erro) {
+            console.error('❌ Erro ao processar evento "PedidoDeletado":', erro);
         }
-
-
-    } catch (erro) {
-        console.error(`❌ Erro ao processar evento "${tipo}":`, erro);
     }
+};
+
+// ============================================================================
+// RECEPTOR DE EVENTOS DO BARRAMENTO
+// POST /eventos
+// ============================================================================
+app.post('/eventos', async (req, res) => {
+    // Responde imediatamente para não bloquear o Barramento
+    res.status(200).json({ msg: 'ok' });
+
+    const { tipo, dados } = req.body;
+
+    // Apostila Microsserviços 4.3.47: o catch vazio ignora os eventos que
+    // não estão no mapa (funcoes[tipo] é undefined e a chamada lança erro).
+    try {
+        await funcoes[tipo](dados);
+    } catch (err) {}
 });
 
 // ============================================================================

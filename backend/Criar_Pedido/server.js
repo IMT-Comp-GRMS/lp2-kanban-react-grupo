@@ -233,6 +233,30 @@ app.delete('/tarefas/:id', async (req, res) => {
 
 /**
  * ============================================================================
+ * MAPA DE FUNÇÕES POR TIPO DE EVENTO
+ * ============================================================================
+ * Padrão da apostila Microsserviços 4.3.47: cada tipo de evento que interessa
+ * a este serviço é uma chave do objeto `funcoes`.
+ */
+const funcoes = {
+    // Espelha no banco KanBan o produto criado no Configurar_Produto.
+    ProdutoCriado: async (dados) => {
+        try {
+            const sql = `
+                INSERT INTO produtos (id, nome, preco)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE nome = VALUES(nome), preco = VALUES(preco)
+            `;
+            await conexao.query(sql, [dados.id, dados.nome, dados.preco]);
+            console.log(`✅ Produto "${dados.nome}" espelhado no banco principal.`);
+        } catch (erro) {
+            console.error('Erro ao espelhar produto:', erro);
+        }
+    }
+};
+
+/**
+ * ============================================================================
  * ROTA: OUVIR EVENTOS DO BARRAMENTO
  * Rota: POST /eventos
  * ============================================================================
@@ -240,19 +264,11 @@ app.delete('/tarefas/:id', async (req, res) => {
 app.post('/eventos', async (req, res) => {
     const { tipo, dados } = req.body;
 
-    if (tipo === 'ProdutoCriado') {
-        try {
-             const sql = `
-            INSERT INTO produtos (id, nome, preco)
-            VALUES (?, ?, ?)
-            ON DUPLICATE KEY UPDATE nome = VALUES(nome), preco = VALUES(preco)
-        `;
-            await conexao.query(sql, [dados.id, dados.nome, dados.preco]);
-            console.log(`✅ Produto "${dados.nome}" espelhado no banco principal.`);
-        } catch (erro) {
-            console.error('Erro ao espelhar produto:', erro);
-        }
-    }
+    // Apostila Microsserviços 4.3.47: o catch vazio ignora os eventos que
+    // não estão no mapa (funcoes[tipo] é undefined e a chamada lança erro).
+    try {
+        await funcoes[tipo](dados);
+    } catch (err) {}
 
     res.status(200).send({ msg: 'ok' });
 });
