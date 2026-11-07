@@ -1,30 +1,25 @@
-# This file configures the static analysis results for your project (errors,
-# warnings, and lints).
+# Análise estática do serviço Configurar_Produto.
 #
-# This enables the 'recommended' set of lints from `package:lints`.
-# This set helps identify many issues that may lead to problems when running
-# or consuming Dart code, and enforces writing Dart using a single, idiomatic
-# style and format.
-#
-# If you want a smaller set of lints you can change this to specify
-# 'package:lints/core.yaml'. These are just the most critical lints
-# (the recommended set includes the core lints).
-# The core lints are also what is used by pub.dev for scoring packages.
+# Parte do conjunto "recommended" do pacote lints e acrescenta as opções da
+# seção 2.5 da apostila Back End com Dart. Para conferir: `dart analyze`.
 
 include: package:lints/recommended.yaml
 
-# Uncomment the following section to specify additional rules.
+analyzer:
+  language:
+    # Proíbe conversões implícitas de dynamic (ex.: atribuir um valor vindo do
+    # JSON a uma variável String sem checar o tipo).
+    strict-casts: true
+    # Exige o tipo genérico explícito (ex.: List<Produto>, e não só List).
+    strict-raw-types: true
 
-# linter:
-#   rules:
-#     - camel_case_types
-
-# analyzer:
-#   exclude:
-#     - path/to/excluded/files/**
-
-# For more information about the core and recommended set of lints, see
-# https://dart.dev/go/core-lints
-
-# For additional information about configuring this file, see
-# https://dart.dev/tools/analysis
+linter:
+  rules:
+    # Variáveis locais que não mudam devem ser final.
+    - prefer_final_locals
+    # Em servidor, use stdout/stderr ou um logger em vez de print.
+    - avoid_print
+    # Toda função e método declara o tipo de retorno.
+    - always_declare_return_types
+    # Future não aguardado precisa ser intencional (await ou unawaited).
+    - unawaited_futures
