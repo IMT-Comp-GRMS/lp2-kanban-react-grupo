@@ -2,6 +2,8 @@
 
 **Projeto semestral das disciplinas ECM252 e ECM516 do IMT**
 
+LINK DA APRESENTAÇÃO: https://youtu.be/L2BLdBO4CEQ
+
 | RA | Nome completo |
 |----|---------------|
 | 23.00758-3 | Guilherme de Santana Pinto |
